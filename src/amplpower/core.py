@@ -2,6 +2,7 @@ import logging
 
 import numpy as np
 import pandas as pd
+from amplpy import AMPL
 from amplpy import add_to_path
 from matpowercaseframes import CaseFrames
 
@@ -10,6 +11,11 @@ add_to_path(r"/opt/ampl/")
 
 def compute(args):
     return max(args, key=len)
+
+
+def array2dict(array):
+    """Convert a 2D numpy array to a dictionary."""
+    return {(i, j): array[i, j] for i in range(array.shape[0]) for j in range(array.shape[1])}
 
 
 class PowerSystem:
@@ -199,7 +205,6 @@ class PowerSystem:
         """Compute Big-M values for the different lines and return them in a DataFrame."""
         self.branches["PFUPDC"] = (1 / self.branches["BR_X"]) * np.pi
         self.branches["PFLODC"] = -(1 / self.branches["BR_X"]) * np.pi
-        print(self.branches[["PFUPDC", "PFLODC"]])
 
     def compute_initial_bigm_ac(self):
         print("=======Computing initial bigM values for AC power flow")
@@ -218,4 +223,77 @@ class PowerSystem:
         self.branches["QFLOAC"] = -self.branches["BFF"] * v2min - self.branches["BFT"] * cosmax + self.branches["GFT"] * sinmax
         self.branches["QTUPAC"] = -self.branches["BTT"] * v2max - self.branches["BTF"] * cosmin + self.branches["GTF"] * sinmin
         self.branches["QTLOAC"] = -self.branches["BTT"] * v2min - self.branches["BTF"] * cosmax + self.branches["GTF"] * sinmax
-        print(self.branches[["PFUPAC", "PFLOAC", "PTUPAC", "PTLOAC", "QFUPAC", "QFLOAC", "QTUPAC", "QTLOAC"]])
+
+    def solve_opf(self, opf_type="dc", switching="off", solver="gurobi", time_limit=3600):
+        """Solve the optimal power flow problem using AMPL.
+        Parameters:
+        opf_type (str): Type of optimal power flow ('dc', 'acrect', 'acjabr')
+        switching (str): Switching strategy ('off', 'nl', 'bigm')
+        solver (str): Solver to use ('gurobi', 'cplex', 'cbc')
+        time_limit (int): Time limit for the optimization
+        Returns:
+        dict: Results of the optimal power flow problem
+        """
+        # set the status of the lines
+        if isinstance(switching, np.ndarray):
+            self.branches["BR_STATUS"] = switching
+        elif switching == "off":
+            self.branches["BR_STATUS"] = 1
+        elif switching == "nl":
+            self.branches["BR_STATUS"] = 2
+        elif switching == "bigm":
+            self.branches["BR_STATUS"] = 3
+
+        print(f"=======Solving OPF with AMPL ({opf_type}) with solver {solver}, time limite {time_limit}")
+        ampl = AMPL()
+        ampl.reset()
+        ampl.read("./src/amplpower/opf.mod")
+
+        ampl.set_data(self.buses, "N")
+        ampl.set_data(self.generators, "G")
+        ampl.set_data(self.branches, "L")
+        ampl.set_data(self.gencost)
+        ampl.param["CF"] = array2dict(self.cf)
+        ampl.param["CT"] = array2dict(self.ct)
+        ampl.param["CG"] = array2dict(self.cg)
+        ampl.param["OPF_TYPE"] = opf_type
+        ampl.param["BASEMVA"] = self.baseMVA
+        ampl.param["MAXVOL"] = self.max_voltage
+        ampl.param["MINVOL"] = self.min_voltage
+        ampl.param["MAXANGLE"] = self.max_angle
+        ampl.param["MINANGLE"] = self.min_angle
+
+        ampl.option["mp_options"] = f"mipgap=0.001 threads=1 outlev=1 timelimit={time_limit}"
+        ampl.solve(solver=solver)
+        solver_status = ampl.solve_result
+
+        if solver_status == "solved" or solver_status == "limit":
+            # Extract solution
+            genp_values = ampl.get_variable("genp").get_values().to_pandas().values.flatten()
+            genq_values = ampl.get_variable("genq").get_values().to_pandas().values.flatten()
+            gen_df = pd.DataFrame({"Pg": genp_values, "Qg": genq_values}, index=ampl.get_variable("genp").get_values().to_pandas().index)
+
+            vol_values = ampl.get_variable("vol").get_values().to_pandas().values.flatten()
+            ang_values = ampl.get_variable("ang").get_values().to_pandas().values.flatten()
+            bus_df = pd.DataFrame({"Vm": vol_values, "Va": ang_values}, index=ampl.get_variable("vol").get_values().to_pandas().index)
+
+            status_values = ampl.get_variable("status").get_values().to_pandas().values.flatten()
+            flowpf_values = ampl.get_variable("flowpf").get_values().to_pandas().values.flatten()
+            flowpt_values = ampl.get_variable("flowpt").get_values().to_pandas().values.flatten()
+            flowqf_values = ampl.get_variable("flowqf").get_values().to_pandas().values.flatten()
+            flowqt_values = ampl.get_variable("flowqt").get_values().to_pandas().values.flatten()
+            line_df = pd.DataFrame(
+                {"switching": status_values, "Pf": flowpf_values, "Pt": flowpt_values, "Qf": flowqf_values, "Qt": flowqt_values},
+                index=ampl.get_variable("status").get_values().to_pandas().index,
+            )
+
+            return {
+                "obj": ampl.get_objective("total_cost").value(),
+                "time": ampl.get_value("_solve_time"),
+                "gen": gen_df,
+                "bus": bus_df,
+                "lin": line_df,
+            }
+
+        elif solver_status == "infeasible":
+            return None

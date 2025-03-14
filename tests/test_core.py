@@ -7,5 +7,6 @@ def test_compute():
 
 
 def test_powersystem():
-    ps = PowerSystem("case9")
+    ps = PowerSystem("./src/amplpower/data/case9.m")
+    ps.solve_opf()
     assert ps is not None
