@@ -13,7 +13,7 @@ def read(*names, **kwargs):
 
 setup(
     name="amplpower",
-    version="0.0.0",
+    version="0.0.2",
     license="MIT",
     description="AMPL package for power systems",
     long_description="{}\n{}".format(
@@ -62,6 +62,10 @@ setup(
     python_requires=">=3.9",
     install_requires=[
         # eg: "aspectlib==1.1.1", "six>=1.7",
+        "amplpy>=0.14.0",
+        "matpowercaseframes==1.1.2",
+        "numpy>=2.2.3",
+        "pandas>=2.2.3",
     ],
     extras_require={
         # eg:
