@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -247,7 +248,7 @@ class PowerSystem:
         print(f"=======Solving OPF with AMPL ({opf_type}) with solver {solver}, time limite {time_limit}")
         ampl = AMPL()
         ampl.reset()
-        ampl.read("./src/amplpower/opf.mod")
+        ampl.read(Path(__file__).parent / "opf.mod")
 
         ampl.set_data(self.buses, "N")
         ampl.set_data(self.generators, "G")
