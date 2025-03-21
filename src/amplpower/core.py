@@ -31,19 +31,10 @@ class PowerSystem:
         self.nbus = 0
         self.nlin = 0
         self.ngen = 0
-        self.epsilon = 1e-6  # Tolerance for zero values
+        self.max_angle = np.pi / 2
+        self.min_angle = -np.pi / 2
 
-        # Admittance matrices (initialize with zeros)
-        self.yff = np.zeros((0, 0))
-        self.ytf = np.zeros((0, 0))
-        self.yft = np.zeros((0, 0))
-        self.ytt = np.zeros((0, 0))
-
-        # Connection matrices
-        self.cf = None
-        self.ct = None
-        self.cg = None  # Matrix for generator connections
-
+        # Initialize everything
         self._load_data()
         self._initialize_matrices()
         self.compute_admittance_matrices()
@@ -77,8 +68,8 @@ class PowerSystem:
             # Minimum and maximum voltage limits
             self.max_voltage = self.buses["VMAX"].max()
             self.min_voltage = self.buses["VMIN"].min()
-            self.max_angle = np.pi / 2
-            self.min_angle = -np.pi / 2
+            self.buses["AMAX"] = self.max_angle
+            self.buses["AMIN"] = self.min_angle
 
             # Convert to per unit
             self.buses["PD"] /= self.baseMVA
@@ -100,6 +91,7 @@ class PowerSystem:
             for line_index in range(self.nlin):
                 if self.branches.loc[line_index, "RATE_A"] == 0:
                     self.branches.loc[line_index, "RATE_A"] = self.default_branch_limit
+
         except Exception as e:
             logging.error(f"Error loading data from {self.case_file}: {e}")
             raise
@@ -204,8 +196,8 @@ class PowerSystem:
     def compute_initial_bigm_dc(self):
         print("=======Computing initial bigM values for DC power flow")
         """Compute Big-M values for the different lines and return them in a DataFrame."""
-        self.branches["PFUPDC"] = (1 / self.branches["BR_X"]) * np.pi
-        self.branches["PFLODC"] = -(1 / self.branches["BR_X"]) * np.pi
+        self.branches["PFUPDC"] = (1 / self.branches["BR_X"]) * (self.cf @ self.buses["AMAX"] - self.ct @ self.buses["AMIN"])
+        self.branches["PFLODC"] = (1 / self.branches["BR_X"]) * (self.cf @ self.buses["AMIN"] - self.ct @ self.buses["AMAX"])
 
     def compute_initial_bigm_ac(self):
         print("=======Computing initial bigM values for AC power flow")
@@ -224,14 +216,16 @@ class PowerSystem:
         self.branches["QFLOAC"] = -self.branches["BFF"] * v2min - self.branches["BFT"] * cosmax + self.branches["GFT"] * sinmax
         self.branches["QTUPAC"] = -self.branches["BTT"] * v2max - self.branches["BTF"] * cosmin + self.branches["GTF"] * sinmin
         self.branches["QTLOAC"] = -self.branches["BTT"] * v2min - self.branches["BTF"] * cosmax + self.branches["GTF"] * sinmax
+        # TODO: change bigm for AC case
 
-    def solve_opf(self, opf_type="dc", switching="off", solver="gurobi", time_limit=3600):
+    def solve_opf(self, opf_type="dc", switching="off", connectivity="off", solver="gurobi", options="outlev=1 timelimit=3600"):
         """Solve the optimal power flow problem using AMPL.
         Parameters:
         opf_type (str): Type of optimal power flow ('dc', 'acrect', 'acjabr')
         switching (str): Switching strategy ('off', 'nl', 'bigm')
+        connectivity (str): Connectivity for topology solutions ('off', 'on')
         solver (str): Solver to use ('gurobi', 'cplex', 'cbc')
-        time_limit (int): Time limit for the optimization
+        options (str): Options for the solver
         Returns:
         dict: Results of the optimal power flow problem
         """
@@ -245,7 +239,9 @@ class PowerSystem:
         elif switching == "bigm":
             self.branches["BR_STATUS"] = 3
 
-        print(f"=======Solving OPF with AMPL ({opf_type}) with solver {solver}, time limite {time_limit}")
+        print(
+            f"=======Solving OPF ({opf_type}) with switching {switching} and connectivity {connectivity} with solver {solver} and options {options}"
+        )
         ampl = AMPL()
         ampl.reset()
         ampl.read(Path(__file__).parent / "opf.mod")
@@ -258,18 +254,17 @@ class PowerSystem:
         ampl.param["CT"] = array2dict(self.ct)
         ampl.param["CG"] = array2dict(self.cg)
         ampl.param["OPF_TYPE"] = opf_type
+        ampl.param["CONNECTIVITY"] = connectivity
         ampl.param["BASEMVA"] = self.baseMVA
         ampl.param["MAXVOL"] = self.max_voltage
         ampl.param["MINVOL"] = self.min_voltage
-        ampl.param["MAXANGLE"] = self.max_angle
-        ampl.param["MINANGLE"] = self.min_angle
 
-        ampl.option["mp_options"] = f"mipgap=0.001 threads=1 outlev=1 timelimit={time_limit}"
+        ampl.option["mp_options"] = options
         ampl.solve(solver=solver)
         solver_status = ampl.solve_result
 
         if solver_status == "solved" or solver_status == "limit":
-            # Extract solution
+            # Get the results
             genp_values = ampl.get_variable("genp").get_values().to_pandas().values.flatten()
             genq_values = ampl.get_variable("genq").get_values().to_pandas().values.flatten()
             gen_df = pd.DataFrame({"Pg": genp_values, "Qg": genq_values}, index=ampl.get_variable("genp").get_values().to_pandas().index)
@@ -294,7 +289,8 @@ class PowerSystem:
                 "gen": gen_df,
                 "bus": bus_df,
                 "lin": line_df,
+                "status": "solved",
             }
 
-        elif solver_status == "infeasible":
-            return None
+        else:
+            return {"obj": None, "time": None, "gen": None, "bus": None, "lin": None, "status": solver_status}

@@ -2,6 +2,7 @@ set N;
 set G;
 set L;
 param OPF_TYPE symbolic;
+param CONNECTIVITY symbolic;
 param BASEMVA;
 param MAXVOL;
 param MINVOL;
@@ -23,6 +24,8 @@ param GS {N};
 param BS {N};
 param VMAX {N};
 param VMIN {N};
+param AMAX {N};
+param AMIN {N};
 param VOL0 {N};
 param ANG0 {N};
 param VOLR0 {N};
@@ -92,7 +95,6 @@ param QFLOAC {L};
 param QFUPAC {L};
 param QTLOAC {L};
 param QTUPAC {L};
-param INCLUDE_MTZ_CONNECTIVITY := if (forall {l in L} (BR_STATUS[l] != 2 and BR_STATUS[l] != 3)) then 1 else 0;
 
 var genp {g in G} >= PMIN[g], <= PMAX[g]:= PG0[g];
 var genq {g in G} >= QMIN[g], <= QMAX[g]:= QG0[g];
@@ -101,12 +103,13 @@ var flowpt {l in L} >= -RATE_A[l], <=RATE_A[l] := PT0[l];
 var flowqf {l in L} >= -RATE_A[l], <=RATE_A[l] := QF0[l];
 var flowqt {l in L} >= -RATE_A[l], <=RATE_A[l] := QT0[l];
 var vol {n in N} >= VMIN[n], <= VMAX[n] := VOL0[n];
-var volr {n in N} >= 0, <=MAXVOL := VOLR0[n];
-var voli {n in N} >= -MAXVOL, <=MAXVOL := VOLI0[n];
-var vol2 {n in N} >= VMIN[n]*VMIN[n], <= VMAX[n]*VMAX[n] := VOL0[n]*VOL0[n];
-var ang {n in N} >= MINANGLE, <= MAXANGLE := ANG0[n];
-var cosft {l in L} >= 0, <= MAXVOL*MAXVOL := sum{n in N} sum{m in N} CF[l,n]*CT[l,m]*(VOLR0[n]*VOLR0[m] + VOLI0[n]*VOLI0[m]);
-var sinft {l in L} >= -MAXVOL*MAXVOL, <= MAXVOL*MAXVOL := sum{n in N} sum{m in N} CF[l,n]*CT[l,m]*(VOLI0[n]*VOLR0[m] - VOLR0[n]*VOLI0[m]);
+var volr {n in N} >= 0, <=VMAX[n] := VOLR0[n];
+var voli {n in N} >= -VMAX[n], <=VMAX[n] := VOLI0[n];
+var vol2 {n in N} >= VMIN[n]^2, <= VMAX[n]^2 := VOL0[n]^2;
+var ang {n in N} >= AMIN[n], <= AMAX[n] := ANG0[n];
+var cosft {l in L} >= 0, <= VMAX[F_BUS[l]]*VMAX[T_BUS[l]] := VOLR0[F_BUS[l]]*VOLR0[T_BUS[l]] + VOLI0[F_BUS[l]]*VOLI0[T_BUS[l]];
+var sinft {l in L} >= -VMAX[F_BUS[l]]*VMAX[T_BUS[l]], <= VMAX[F_BUS[l]]*VMAX[T_BUS[l]] := VOLI0[F_BUS[l]]*VOLR0[T_BUS[l]] - VOLR0[F_BUS[l]]*VOLI0[T_BUS[l]];
+# TODO: I think these bounds can be improved considering that sinft is a small number
 var flowpf_aux {l in L} >= min(PFLODC[l],PFLOAC[l]), <= max(PFUPDC[l],PFUPAC[l]) := PF0[l];
 var flowpt_aux {l in L} >= PTLOAC[l], <= PTUPAC[l] := PT0[l];
 var flowqf_aux {l in L} >= QFLOAC[l], <= QFUPAC[l] := QF0[l];
@@ -332,16 +335,16 @@ subject to eq_slack_imag:
 
 ########## CONNECTIVITY CONSTRAINTS ##########
 
-subject to status_split {l in L: BR_STATUS[l] == 2 or BR_STATUS[l] == 3}:
+subject to status_split {l in L: CONNECTIVITY = 'on' and (BR_STATUS[l] == 2 or BR_STATUS[l] == 3)}:
     statusf[l] + statust[l] == status[l];
 
-subject to connectivity {n in N}:
+subject to connectivity {n in N: CONNECTIVITY = 'on'}:
     sum {l in L: F_BUS[l] == n} statusf[l] + sum {l in L: T_BUS[l] == n} statust[l] >= 1;
 
-subject to mtz_connectivity_f {l in L: INCLUDE_MTZ_CONNECTIVITY==1 and F_BUS[l] != 0 and T_BUS[l] != 0}:
+subject to mtz_connectivity_f {l in L: CONNECTIVITY = 'on' and F_BUS[l] != 0 and T_BUS[l] != 0}:
     u[F_BUS[l]] - u[T_BUS[l]] + card(N) * statusf[l] <= card(N) - 1;
 
-subject to mtz_connectivity_t {l in L: INCLUDE_MTZ_CONNECTIVITY==1 and F_BUS[l] != 0 and T_BUS[l] != 0}:
+subject to mtz_connectivity_t {l in L: CONNECTIVITY = 'on' and F_BUS[l] != 0 and T_BUS[l] != 0}:
     u[T_BUS[l]] - u[F_BUS[l]] + card(N) * statust[l] <= card(N) - 1;
 
 subject to eq_slack_mtz:
