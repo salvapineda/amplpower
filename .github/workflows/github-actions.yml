@@ -142,6 +142,7 @@ jobs:
         pip --version
         tox --version
         pip list --format=freeze
+        python -m pip install amplpy --upgrade
         python -m amplpy.modules install gurobi
         python -m amplpy.modules activate 49a5a161-9032-4add-b0cc-ea7bcfe0d508
     - name: test
