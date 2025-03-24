@@ -3,7 +3,7 @@ requires = [
     "setuptools>=40.1.0",
     "amplpy>=0.14.0",
     "matpowercaseframes==1.1.2",
-    "numpy>=2.2.3",
+    "numpy>=1.26.4",
     "pandas>=2.2.3",
 ]
 

@@ -64,7 +64,7 @@ setup(
         # eg: "aspectlib==1.1.1", "six>=1.7",
         "amplpy>=0.14.0",
         "matpowercaseframes==1.1.2",
-        "numpy>=2.2.3",
+        "numpy>=1.26.4",
         "pandas>=2.2.3",
     ],
     extras_require={
