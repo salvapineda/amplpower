@@ -14,6 +14,9 @@ def compute(args):
     return max(args, key=len)
 
 
+# TODO: Remove compute function at some point
+
+
 def array2dict(array):
     """Convert a 2D numpy array to a dictionary."""
     return {(i, j): array[i, j] for i in range(array.shape[0]) for j in range(array.shape[1])}
@@ -61,9 +64,13 @@ class PowerSystem:
             self.branches["T_BUS"] -= 1
             self.gencost = case.gencost
             self.gencost.reset_index(drop=True, inplace=True)
-            self.nbus = len(self.buses)  # Number of buses
-            self.nlin = len(self.branches)  # Number of branches
-            self.ngen = len(self.generators)  # Number of generators
+            self.nbus = len(self.buses)
+            self.nlin = len(self.branches)
+            self.ngen = len(self.generators)
+
+            # Add default values for generator costs if not provided
+            if "COST_2" not in self.gencost.columns:
+                self.gencost["COST_2"] = 0
 
             # Minimum and maximum voltage limits
             self.max_voltage = self.buses["VMAX"].max()
@@ -86,7 +93,7 @@ class PowerSystem:
             self.branches["RATE_B"] /= self.baseMVA
             self.branches["RATE_C"] /= self.baseMVA
 
-            # Set default branch limit
+            # Set default branch limit if not provided
             self.default_branch_limit = np.sqrt(self.buses["PD"].sum() ** 2 + self.buses["QD"].sum() ** 2)
             for line_index in range(self.nlin):
                 if self.branches.loc[line_index, "RATE_A"] == 0:
@@ -269,8 +276,14 @@ class PowerSystem:
             genq_values = ampl.get_variable("genq").get_values().to_pandas().values.flatten()
             gen_df = pd.DataFrame({"Pg": genp_values, "Qg": genq_values}, index=ampl.get_variable("genp").get_values().to_pandas().index)
 
-            vol_values = ampl.get_variable("vol").get_values().to_pandas().values.flatten()
-            ang_values = ampl.get_variable("ang").get_values().to_pandas().values.flatten()
+            if opf_type in ["acrect", "acjabr"]:
+                volr = ampl.get_variable("volr").get_values().to_pandas().values.flatten()
+                voli = ampl.get_variable("voli").get_values().to_pandas().values.flatten()
+                vol_values = np.sqrt(volr**2 + voli**2)
+                ang_values = np.arctan2(voli, volr)
+            else:
+                vol_values = ampl.get_variable("vol").get_values().to_pandas().values.flatten()
+                ang_values = ampl.get_variable("ang").get_values().to_pandas().values.flatten()
             bus_df = pd.DataFrame({"Vm": vol_values, "Va": ang_values}, index=ampl.get_variable("vol").get_values().to_pandas().index)
 
             status_values = ampl.get_variable("status").get_values().to_pandas().values.flatten()
