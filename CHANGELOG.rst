@@ -1,6 +1,12 @@
 Changelog
 =========
 
+0.0.7 (2025-03-25)
+------------------
+
+* Included default COST2 for generators (gencos) if not provided.
+* Corrected voltage results for AC rectangular (acrect) and AC Jabr (acjabr) formulations.
+
 0.0.6 (2025-03-21)
 ------------------
 
