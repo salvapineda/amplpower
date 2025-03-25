@@ -144,7 +144,7 @@ jobs:
         pip list --format=freeze
         python -m pip install amplpy --upgrade
         python -m amplpy.modules install gurobi
-        python -m amplpy.modules activate 49a5a161-9032-4add-b0cc-ea7bcfe0d508
+        python -m amplpy.modules activate ${{ secrets.AMPL_UUID }}
     - name: test
       env:
         TOXPYTHON: '${{ matrix.toxpython }}'
