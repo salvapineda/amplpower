@@ -276,15 +276,36 @@ class PowerSystem:
             genq_values = ampl.get_variable("genq").get_values().to_pandas().values.flatten()
             gen_df = pd.DataFrame({"Pg": genp_values, "Qg": genq_values}, index=ampl.get_variable("genp").get_values().to_pandas().index)
 
-            if opf_type in ["acrect", "acjabr"]:
+            if opf_type == "acrect":
                 volr = ampl.get_variable("volr").get_values().to_pandas().values.flatten()
                 voli = ampl.get_variable("voli").get_values().to_pandas().values.flatten()
-                vol_values = np.sqrt(volr**2 + voli**2)
-                ang_values = np.arctan2(voli, volr)
+                Vm = np.sqrt(volr**2 + voli**2)
+                Va = np.arctan2(voli, volr)
+            elif opf_type == "acjabr":
+                vol2 = ampl.get_variable("vol2").get_values().to_pandas().values.flatten()
+                Vm = np.sqrt(vol2)
+                vfvtcosft = ampl.get_variable("cosft").get_values().to_pandas().values.flatten()
+                vfvt = np.array([Vm[int(self.branches.loc[i, "F_BUS"])] * Vm[int(self.branches.loc[i, "T_BUS"])] for i in range(self.nlin)])
+                cosft = np.maximum(-1, np.minimum(1, vfvtcosft / vfvt))
+                # Compute angles for all buses
+                Va = np.full(self.nbus, np.nan)  # Initialize angles with NaN
+                Va[0] = 0  # Reference bus angle is 0
+                # Iteratively compute angles
+                visited = {0}  # Start with the reference bus
+                while len(visited) < self.nbus:
+                    for line_index in range(self.nlin):
+                        f_bus = int(self.branches.loc[line_index, "F_BUS"])
+                        t_bus = int(self.branches.loc[line_index, "T_BUS"])
+                        if f_bus in visited and np.isnan(Va[t_bus]):
+                            Va[t_bus] = Va[f_bus] + np.arccos(cosft[line_index])
+                            visited.add(t_bus)
+                        elif t_bus in visited and np.isnan(Va[f_bus]):
+                            Va[f_bus] = Va[t_bus] - np.arccos(cosft[line_index])
+                            visited.add(f_bus)
             else:
-                vol_values = ampl.get_variable("vol").get_values().to_pandas().values.flatten()
-                ang_values = ampl.get_variable("ang").get_values().to_pandas().values.flatten()
-            bus_df = pd.DataFrame({"Vm": vol_values, "Va": ang_values}, index=ampl.get_variable("vol").get_values().to_pandas().index)
+                Vm = ampl.get_variable("vol").get_values().to_pandas().values.flatten()
+                Va = ampl.get_variable("ang").get_values().to_pandas().values.flatten()
+            bus_df = pd.DataFrame({"Vm": Vm, "Va": Va}, index=ampl.get_variable("vol").get_values().to_pandas().index)
 
             status_values = ampl.get_variable("status").get_values().to_pandas().values.flatten()
             flowpf_values = ampl.get_variable("flowpf").get_values().to_pandas().values.flatten()
