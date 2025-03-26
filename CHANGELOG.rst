@@ -1,6 +1,13 @@
 Changelog
 =========
 
+0.0.9 (2025-03-26)
+------------------
+
+* Tightest computation of bigMs for AC OTS.
+* Tightest bounds for variables cosft and sinft.
+* Add feasibility slacks to results
+
 0.0.8 (2025-03-25)
 ------------------
 

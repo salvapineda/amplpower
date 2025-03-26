@@ -20,7 +20,11 @@ def test_compute():
 def test_opf(opf_type):
     ps = PowerSystem("./src/amplpower/data/case9.m")
     results = ps.solve_opf(opf_type=opf_type, switching="off", connectivity="off", solver="gurobi", options="outlev=1 timelimit=5")
-    print(results)
+    print(f"Objective function value: {results['obj']}")
+    print(f"Time: {results['time']}")
+    print(results["gen"])
+    print(results["bus"])
+    print(results["lin"])
     assert results["status"] == "solved"
 
 
@@ -32,5 +36,9 @@ def test_ots(opf_type, switching, connectivity):
     results = ps.solve_opf(
         opf_type=opf_type, switching=switching, connectivity=connectivity, solver="gurobi", options="outlev=1 timelimit=5"
     )
-    print(results)
+    print(f"Objective function value: {results['obj']}")
+    print(f"Time: {results['time']}")
+    print(results["gen"])
+    print(results["bus"])
+    print(results["lin"])
     assert results["status"] == "solved"

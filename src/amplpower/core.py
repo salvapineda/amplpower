@@ -345,11 +345,44 @@ class PowerSystem:
         solver_status = ampl.solve_result
 
         if solver_status == "solved" or solver_status == "limit":
-            # Get the results
-            genp_values = ampl.get_variable("genp").get_values().to_pandas().values.flatten()
-            genq_values = ampl.get_variable("genq").get_values().to_pandas().values.flatten()
-            gen_df = pd.DataFrame({"Pg": genp_values, "Qg": genq_values}, index=ampl.get_variable("genp").get_values().to_pandas().index)
+            # Get the generation results
+            Pg = ampl.get_variable("genp").get_values().to_pandas().values.flatten()
+            Qg = ampl.get_variable("genq").get_values().to_pandas().values.flatten()
+            Pg_ls = np.minimum(Pg - self.generators["PMIN"].values, 0)
+            Pg_us = np.maximum(Pg - self.generators["PMAX"].values, 0)
+            Qg_ls = np.minimum(Qg - self.generators["QMIN"].values, 0)
+            Qg_us = np.maximum(Qg - self.generators["QMAX"].values, 0)
+            gen_df = pd.DataFrame(
+                {"Pg": Pg, "Qg": Qg, "Pg_ls": Pg_ls, "Pg_us": Pg_us, "Qg_ls": Qg_ls, "Qg_us": Qg_us},
+                index=ampl.get_variable("genp").get_values().to_pandas().index,
+            )
 
+            # Get the line results
+            switching = ampl.get_variable("status").get_values().to_pandas().values.flatten()
+            Pf = ampl.get_variable("flowpf").get_values().to_pandas().values.flatten()
+            Pt = ampl.get_variable("flowpt").get_values().to_pandas().values.flatten()
+            Qf = ampl.get_variable("flowqf").get_values().to_pandas().values.flatten()
+            Qt = ampl.get_variable("flowqt").get_values().to_pandas().values.flatten()
+            Sf = Pf + 1j * Qf
+            St = Pt + 1j * Qt
+            Sf_us = np.maximum(abs(Sf) - self.branches["RATE_A"].values, 0)
+            St_us = np.maximum(abs(St) - self.branches["RATE_A"].values, 0)
+            line_df = pd.DataFrame(
+                {
+                    "switching": switching,
+                    "Pf": Pf,
+                    "Pt": Pt,
+                    "Qf": Qf,
+                    "Qt": Qt,
+                    "Sf": abs(Sf),
+                    "St": abs(St),
+                    "Sf_us": Sf_us,
+                    "St_us": St_us,
+                },
+                index=ampl.get_variable("status").get_values().to_pandas().index,
+            )
+
+            # Get the voltage results
             if opf_type == "acrect":
                 volr = ampl.get_variable("volr").get_values().to_pandas().values.flatten()
                 voli = ampl.get_variable("voli").get_values().to_pandas().values.flatten()
@@ -379,16 +412,29 @@ class PowerSystem:
             else:
                 Vm = ampl.get_variable("vol").get_values().to_pandas().values.flatten()
                 Va = ampl.get_variable("ang").get_values().to_pandas().values.flatten()
-            bus_df = pd.DataFrame({"Vm": Vm, "Va": Va}, index=ampl.get_variable("vol").get_values().to_pandas().index)
-
-            status_values = ampl.get_variable("status").get_values().to_pandas().values.flatten()
-            flowpf_values = ampl.get_variable("flowpf").get_values().to_pandas().values.flatten()
-            flowpt_values = ampl.get_variable("flowpt").get_values().to_pandas().values.flatten()
-            flowqf_values = ampl.get_variable("flowqf").get_values().to_pandas().values.flatten()
-            flowqt_values = ampl.get_variable("flowqt").get_values().to_pandas().values.flatten()
-            line_df = pd.DataFrame(
-                {"switching": status_values, "Pf": flowpf_values, "Pt": flowpt_values, "Qf": flowqf_values, "Qt": flowqt_values},
-                index=ampl.get_variable("status").get_values().to_pandas().index,
+            Vm_ls = np.minimum(Vm - self.buses["VMIN"].values, 0)
+            Vm_us = np.maximum(Vm - self.buses["VMAX"].values, 0)
+            Va_ls = np.minimum(Va - self.buses["AMIN"].values, 0)
+            Va_us = np.maximum(Va - self.buses["AMAX"].values, 0)
+            # Computation of power injections
+            Sd = self.buses["PD"].values + 1j * self.buses["QD"].values
+            Sg = Pg + 1j * Qg
+            Ssh = self.buses["GS"].values * Vm**2 - 1j * self.buses["BS"].values * Vm**2
+            S_slack = Sg @ self.cg - Sd - Ssh - Sf @ self.cf - St @ self.ct
+            P_slack = np.real(S_slack)
+            Q_slack = np.imag(S_slack)
+            bus_df = pd.DataFrame(
+                {
+                    "Vm": Vm,
+                    "Va": Va,
+                    "Vm_ls": Vm_ls,
+                    "Vm_us": Vm_us,
+                    "Va_ls": Va_ls,
+                    "Va_us": Va_us,
+                    "P_slack": P_slack,
+                    "Q_slack": Q_slack,
+                },
+                index=ampl.get_variable("vol").get_values().to_pandas().index,
             )
 
             return {
