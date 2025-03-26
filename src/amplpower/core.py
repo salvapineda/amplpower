@@ -197,7 +197,7 @@ class PowerSystem:
         print("=======Computing initial bigM values for DC power flow")
         self.branches["PFUPDC"] = (1 / self.branches["BR_X"]) * (self.cf @ self.buses["AMAX"] - self.ct @ self.buses["AMIN"])
         self.branches["PFLODC"] = (1 / self.branches["BR_X"]) * (self.cf @ self.buses["AMIN"] - self.ct @ self.buses["AMAX"])
-        print(self.branches[["PFUPDC", "PFLODC"]])
+        # print(self.branches[["PFUPDC", "PFLODC"]])
 
     def compute_initial_bigm_ac(self):
         """Compute Big-M values for AC the different lines and return them in a DataFrame."""
@@ -210,6 +210,10 @@ class PowerSystem:
         self.branches["QFLOAC"] = np.zeros(self.nlin)
         self.branches["QTUPAC"] = np.zeros(self.nlin)
         self.branches["QTLOAC"] = np.zeros(self.nlin)
+        self.branches["COSFTMAX"] = np.zeros(self.nlin)
+        self.branches["COSFTMIN"] = np.zeros(self.nlin)
+        self.branches["SINFTMAX"] = np.zeros(self.nlin)
+        self.branches["SINFTMIN"] = np.zeros(self.nlin)
         for lin_index in range(self.nlin):  # Changed 'lin' to 'lin_index'
             f_bus = int(self.branches.loc[lin_index, "F_BUS"])
             t_bus = int(self.branches.loc[lin_index, "T_BUS"])
@@ -251,31 +255,49 @@ class PowerSystem:
                     + self.branches.loc[lin_index, "GTF"] * x[0] * x[1] * np.sin(x[3] - x[2])
                 )
 
+            def cosft(x):
+                return x[0] * x[1] * np.cos(x[2] - x[3])
+
+            def sinft(x):
+                return x[0] * x[1] * np.sin(x[2] - x[3])
+
             self.branches.loc[lin_index, "PFUPAC"] = (
-                -1 * minimize(pfac, x0, bounds=[(vminf, vmaxf), (vmint, vmaxt), (aminf, amaxf), (amint, amaxt)]).fun
+                -1 * minimize(lambda x: -pfac(x), x0, bounds=[(vminf, vmaxf), (vmint, vmaxt), (aminf, amaxf), (amint, amaxt)]).fun
             )
             self.branches.loc[lin_index, "PFLOAC"] = minimize(
                 pfac, x0, bounds=[(vminf, vmaxf), (vmint, vmaxt), (aminf, amaxf), (amint, amaxt)]
             ).fun
             self.branches.loc[lin_index, "PTUPAC"] = (
-                -1 * minimize(ptac, x0, bounds=[(vminf, vmaxf), (vmint, vmaxt), (aminf, amaxf), (amint, amaxt)]).fun
+                -1 * minimize(lambda x: -ptac(x), x0, bounds=[(vminf, vmaxf), (vmint, vmaxt), (aminf, amaxf), (amint, amaxt)]).fun
             )
             self.branches.loc[lin_index, "PTLOAC"] = minimize(
                 ptac, x0, bounds=[(vminf, vmaxf), (vmint, vmaxt), (aminf, amaxf), (amint, amaxt)]
             ).fun
             self.branches.loc[lin_index, "QFUPAC"] = (
-                -1 * minimize(qfac, x0, bounds=[(vminf, vmaxf), (vmint, vmaxt), (aminf, amaxf), (amint, amaxt)]).fun
+                -1 * minimize(lambda x: -qfac(x), x0, bounds=[(vminf, vmaxf), (vmint, vmaxt), (aminf, amaxf), (amint, amaxt)]).fun
             )
             self.branches.loc[lin_index, "QFLOAC"] = minimize(
                 qfac, x0, bounds=[(vminf, vmaxf), (vmint, vmaxt), (aminf, amaxf), (amint, amaxt)]
             ).fun
             self.branches.loc[lin_index, "QTUPAC"] = (
-                -1 * minimize(qtac, x0, bounds=[(vminf, vmaxf), (vmint, vmaxt), (aminf, amaxf), (amint, amaxt)]).fun
+                -1 * minimize(lambda x: -qtac(x), x0, bounds=[(vminf, vmaxf), (vmint, vmaxt), (aminf, amaxf), (amint, amaxt)]).fun
             )
             self.branches.loc[lin_index, "QTLOAC"] = minimize(
                 qtac, x0, bounds=[(vminf, vmaxf), (vmint, vmaxt), (aminf, amaxf), (amint, amaxt)]
             ).fun
-        print(self.branches[["PFUPAC", "PFLOAC", "PTUPAC", "PTLOAC", "QFUPAC", "QFLOAC", "QTUPAC", "QTLOAC"]])
+            self.branches.loc[lin_index, "COSFTMAX"] = (
+                -1 * minimize(lambda x: -cosft(x), x0, bounds=[(vminf, vmaxf), (vmint, vmaxt), (aminf, amaxf), (amint, amaxt)]).fun
+            )
+            self.branches.loc[lin_index, "COSFTMIN"] = minimize(
+                cosft, x0, bounds=[(vminf, vmaxf), (vmint, vmaxt), (aminf, amaxf), (amint, amaxt)]
+            ).fun
+            self.branches.loc[lin_index, "SINFTMAX"] = (
+                -1 * minimize(lambda x: -sinft(x), x0, bounds=[(vminf, vmaxf), (vmint, vmaxt), (aminf, amaxf), (amint, amaxt)]).fun
+            )
+            self.branches.loc[lin_index, "SINFTMIN"] = minimize(
+                sinft, x0, bounds=[(vminf, vmaxf), (vmint, vmaxt), (aminf, amaxf), (amint, amaxt)]
+            ).fun
+        # print(self.branches[["PFUPAC", "PFLOAC", "PTUPAC", "PTLOAC", "QFUPAC", "QFLOAC", "QTUPAC", "QTLOAC"]])
 
     def solve_opf(self, opf_type="dc", switching="off", connectivity="off", solver="gurobi", options="outlev=1 timelimit=3600"):
         """Solve the optimal power flow problem using AMPL.

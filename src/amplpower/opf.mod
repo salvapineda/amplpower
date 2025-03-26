@@ -95,6 +95,10 @@ param QFLOAC {L};
 param QFUPAC {L};
 param QTLOAC {L};
 param QTUPAC {L};
+param COSFTMAX {L};
+param COSFTMIN {L};
+param SINFTMAX {L};
+param SINFTMIN {L};
 
 var genp {g in G} >= PMIN[g], <= PMAX[g]:= PG0[g];
 var genq {g in G} >= QMIN[g], <= QMAX[g]:= QG0[g];
@@ -107,9 +111,8 @@ var volr {n in N} >= 0, <=VMAX[n] := VOLR0[n];
 var voli {n in N} >= -VMAX[n], <=VMAX[n] := VOLI0[n];
 var vol2 {n in N} >= VMIN[n]^2, <= VMAX[n]^2 := VOL0[n]^2;
 var ang {n in N} >= AMIN[n], <= AMAX[n] := ANG0[n];
-var cosft {l in L} >= 0, <= VMAX[F_BUS[l]]*VMAX[T_BUS[l]] := VOLR0[F_BUS[l]]*VOLR0[T_BUS[l]] + VOLI0[F_BUS[l]]*VOLI0[T_BUS[l]];
-var sinft {l in L} >= -VMAX[F_BUS[l]]*VMAX[T_BUS[l]], <= VMAX[F_BUS[l]]*VMAX[T_BUS[l]] := VOLI0[F_BUS[l]]*VOLR0[T_BUS[l]] - VOLR0[F_BUS[l]]*VOLI0[T_BUS[l]];
-# TODO: I think these bounds can be improved considering that sinft is a small number
+var cosft {l in L} >= COSFTMIN[l], <= COSFTMAX[l] := VOL0[F_BUS[l]]*VOL0[T_BUS[l]]*cos(ANG0[F_BUS[l]]-ANG0[T_BUS[l]]);
+var sinft {l in L} >= SINFTMIN[l], <= SINFTMAX[l] := VOL0[F_BUS[l]]*VOL0[T_BUS[l]]*sin(ANG0[F_BUS[l]]-ANG0[T_BUS[l]]);
 var flowpf_aux {l in L} >= min(PFLODC[l],PFLOAC[l]), <= max(PFUPDC[l],PFUPAC[l]) := PF0[l];
 var flowpt_aux {l in L} >= PTLOAC[l], <= PTUPAC[l] := PT0[l];
 var flowqf_aux {l in L} >= QFLOAC[l], <= QFUPAC[l] := QF0[l];
