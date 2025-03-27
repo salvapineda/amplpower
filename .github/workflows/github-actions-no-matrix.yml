@@ -18,6 +18,8 @@ jobs:
         tox --version
         pip list --format=freeze
         python -m amplpy.modules install highs
+        python -m amplpy.modules activate ${{ secrets.AMPL_UUID }}
+        python -m amplpy.modules run ampl -vvq
     - name: test
       env:
         TOXPYTHON: 'python3.11'
