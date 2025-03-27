@@ -9,7 +9,6 @@ from matpowercaseframes import CaseFrames
 from scipy.optimize import minimize
 
 add_to_path(r"/opt/ampl/")
-add_to_path(r'/opt/hostedtoolcache/Python/3.11.11/x64/lib/python3.11/site-packages/ampl_module_base/bin"')
 
 
 def compute(args):
