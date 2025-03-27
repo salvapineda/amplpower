@@ -100,23 +100,23 @@ param COSFTMIN {L};
 param SINFTMAX {L};
 param SINFTMIN {L};
 
-var genp {g in G} >= PMIN[g], <= PMAX[g]:= PG0[g];
-var genq {g in G} >= QMIN[g], <= QMAX[g]:= QG0[g];
-var flowpf {l in L} >= -RATE_A[l], <=RATE_A[l] := PF0[l];
-var flowpt {l in L} >= -RATE_A[l], <=RATE_A[l] := PT0[l];
-var flowqf {l in L} >= -RATE_A[l], <=RATE_A[l] := QF0[l];
-var flowqt {l in L} >= -RATE_A[l], <=RATE_A[l] := QT0[l];
-var vol {n in N} >= VMIN[n], <= VMAX[n] := VOL0[n];
-var volr {n in N} >= 0, <=VMAX[n] := VOLR0[n];
-var voli {n in N} >= -VMAX[n], <=VMAX[n] := VOLI0[n];
-var vol2 {n in N} >= VMIN[n]^2, <= VMAX[n]^2 := VOL0[n]^2;
-var ang {n in N} >= AMIN[n], <= AMAX[n] := ANG0[n];
+var Pg {g in G} >= PMIN[g], <= PMAX[g]:= PG0[g];
+var Qg {g in G} >= QMIN[g], <= QMAX[g]:= QG0[g];
+var Pf {l in L} >= -RATE_A[l], <=RATE_A[l] := PF0[l];
+var Pt {l in L} >= -RATE_A[l], <=RATE_A[l] := PT0[l];
+var Qf {l in L} >= -RATE_A[l], <=RATE_A[l] := QF0[l];
+var Qt {l in L} >= -RATE_A[l], <=RATE_A[l] := QT0[l];
+var Vm {n in N} >= VMIN[n], <= VMAX[n] := VOL0[n];
+var Vr {n in N} >= 0, <=VMAX[n] := VOLR0[n];
+var Vi {n in N} >= -VMAX[n], <=VMAX[n] := VOLI0[n];
+var V2 {n in N} >= VMIN[n]^2, <= VMAX[n]^2 := VOL0[n]^2;
+var Va {n in N} >= AMIN[n], <= AMAX[n] := ANG0[n];
 var cosft {l in L} >= COSFTMIN[l], <= COSFTMAX[l] := VOL0[F_BUS[l]]*VOL0[T_BUS[l]]*cos(ANG0[F_BUS[l]]-ANG0[T_BUS[l]]);
 var sinft {l in L} >= SINFTMIN[l], <= SINFTMAX[l] := VOL0[F_BUS[l]]*VOL0[T_BUS[l]]*sin(ANG0[F_BUS[l]]-ANG0[T_BUS[l]]);
-var flowpf_aux {l in L} >= min(PFLODC[l],PFLOAC[l]), <= max(PFUPDC[l],PFUPAC[l]) := PF0[l];
-var flowpt_aux {l in L} >= PTLOAC[l], <= PTUPAC[l] := PT0[l];
-var flowqf_aux {l in L} >= QFLOAC[l], <= QFUPAC[l] := QF0[l];
-var flowqt_aux {l in L} >= QTLOAC[l], <= QTUPAC[l] := QT0[l];
+var Pfa {l in L} >= min(PFLODC[l],PFLOAC[l]), <= max(PFUPDC[l],PFUPAC[l]) := PF0[l];
+var Pta {l in L} >= PTLOAC[l], <= PTUPAC[l] := PT0[l];
+var Qfa {l in L} >= QFLOAC[l], <= QFUPAC[l] := QF0[l];
+var Qta {l in L} >= QTLOAC[l], <= QTUPAC[l] := QT0[l];
 var u {n in N} >= 1, <= card(N);
 var status {l in L} binary;
 var statusf {l in L} binary;
@@ -125,216 +125,216 @@ var statust {l in L} binary;
 ########## OBJECTIVE FUNCTION ##########
 
 minimize total_cost:
-    sum {g in G} (COST_2[g] * (BASEMVA*genp[g])^2 + COST_1[g] * (BASEMVA*genp[g]) + COST_0[g]);
+    sum {g in G} (COST_2[g] * (BASEMVA*Pg[g])^2 + COST_1[g] * (BASEMVA*Pg[g]) + COST_0[g]);
 
 ########## POWER BALANCE ##########
 
 subject to active_power_balance_1 {n in N:OPF_TYPE='dc'}:
-    sum {g in G} CG[g,n] * genp[g] - PD[n] = sum {l in L} (CF[l,n] * flowpf[l] + CT[l,n] * flowpt[l]);
+    sum {g in G} CG[g,n] * Pg[g] - PD[n] = sum {l in L} (CF[l,n] * Pf[l] + CT[l,n] * Pt[l]);
 
 subject to active_power_balance_2 {n in N:OPF_TYPE='acpolar'}:
-    sum {g in G} CG[g,n] * genp[g] - PD[n] = GS[n]*vol[n]*vol[n] + sum {l in L} (CF[l,n] * flowpf[l] + CT[l,n] * flowpt[l]);
+    sum {g in G} CG[g,n] * Pg[g] - PD[n] = GS[n]*Vm[n]*Vm[n] + sum {l in L} (CF[l,n] * Pf[l] + CT[l,n] * Pt[l]);
 
 subject to reactive_power_balance_2 {n in N:OPF_TYPE='acpolar'}:
-    sum {g in G} CG[g,n] * genq[g] - QD[n] = -BS[n]*vol[n]*vol[n] + sum {l in L} (CF[l,n] * flowqf[l] + CT[l,n] * flowqt[l]);
+    sum {g in G} CG[g,n] * Qg[g] - QD[n] = -BS[n]*Vm[n]*Vm[n] + sum {l in L} (CF[l,n] * Qf[l] + CT[l,n] * Qt[l]);
 
 subject to active_power_balance_3_4 {n in N: OPF_TYPE = 'acrect' or OPF_TYPE = 'acjabr'}:
-    sum {g in G} CG[g,n] * genp[g] - PD[n] = GS[n]*vol2[n] + sum {l in L} (CF[l,n] * flowpf[l] + CT[l,n] * flowpt[l]);
+    sum {g in G} CG[g,n] * Pg[g] - PD[n] = GS[n]*V2[n] + sum {l in L} (CF[l,n] * Pf[l] + CT[l,n] * Pt[l]);
 
 subject to reactive_power_balance_3_4 {n in N: OPF_TYPE = 'acrect' or OPF_TYPE = 'acjabr'}:
-    sum {g in G} CG[g,n] * genq[g] - QD[n] = -BS[n]*vol2[n] + sum {l in L} (CF[l,n] * flowqf[l] + CT[l,n] * flowqt[l]);
+    sum {g in G} CG[g,n] * Qg[g] - QD[n] = -BS[n]*V2[n] + sum {l in L} (CF[l,n] * Qf[l] + CT[l,n] * Qt[l]);
 
 ########## POWER FLOW DEFINITIONS (BR_STATUS = 0) ##########
 
 subject to active_flow_from_0 {l in L:BR_STATUS[l] == 0}:
-    flowpf[l] = 0;
+    Pf[l] = 0;
 
 subject to active_flow_to_0 {l in L:BR_STATUS[l] == 0}:
-    flowpt[l] = 0;
+    Pt[l] = 0;
 
 subject to reactive_flow_from_0 {l in L:BR_STATUS[l] == 0}:
-    flowqf[l] = 0;
+    Qf[l] = 0;
 
 subject to reactive_flow_to_0 {l in L:BR_STATUS[l] == 0}:
-    flowqt[l] = 0;
+    Qt[l] = 0;
 
 ########## POWER FLOW DEFINITIONS (BR_STATUS = 1) ##########
 
 subject to active_flow_from_1 {l in L:OPF_TYPE='dc' and BR_STATUS[l] == 1}:
-    flowpf[l] = (1 / BR_X[l]) * (ang[F_BUS[l]] - ang[T_BUS[l]]);
+    Pf[l] = (1 / BR_X[l]) * (Va[F_BUS[l]] - Va[T_BUS[l]]);
 
 subject to active_flow_to_1 {l in L:OPF_TYPE='dc' and BR_STATUS[l] == 1}:
-    flowpt[l] = (1 / BR_X[l]) * (ang[T_BUS[l]] - ang[F_BUS[l]]);
+    Pt[l] = (1 / BR_X[l]) * (Va[T_BUS[l]] - Va[F_BUS[l]]);
 
 subject to active_flow_from_2 {l in L:OPF_TYPE='acpolar' and BR_STATUS[l] == 1}:
-    flowpf[l] = GFF[l]*vol[F_BUS[l]]*vol[F_BUS[l]] + vol[F_BUS[l]]*vol[T_BUS[l]]*(GFT[l]*cos(ang[F_BUS[l]]-ang[T_BUS[l]])+BFT[l]*sin(ang[F_BUS[l]]-ang[T_BUS[l]]));
+    Pf[l] = GFF[l]*Vm[F_BUS[l]]*Vm[F_BUS[l]] + Vm[F_BUS[l]]*Vm[T_BUS[l]]*(GFT[l]*cos(Va[F_BUS[l]]-Va[T_BUS[l]])+BFT[l]*sin(Va[F_BUS[l]]-Va[T_BUS[l]]));
 
 subject to active_flow_to_2 {l in L:OPF_TYPE='acpolar' and BR_STATUS[l] == 1}:
-    flowpt[l] = GTT[l]*vol[T_BUS[l]]*vol[T_BUS[l]] + vol[F_BUS[l]]*vol[T_BUS[l]]*(GTF[l]*cos(ang[T_BUS[l]]-ang[F_BUS[l]])+BTF[l]*sin(ang[T_BUS[l]]-ang[F_BUS[l]]));
+    Pt[l] = GTT[l]*Vm[T_BUS[l]]*Vm[T_BUS[l]] + Vm[F_BUS[l]]*Vm[T_BUS[l]]*(GTF[l]*cos(Va[T_BUS[l]]-Va[F_BUS[l]])+BTF[l]*sin(Va[T_BUS[l]]-Va[F_BUS[l]]));
 
 subject to reactive_flow_from_2 {l in L:OPF_TYPE='acpolar' and BR_STATUS[l] == 1}:
-    flowqf[l] = -BFF[l]*vol[F_BUS[l]]*vol[F_BUS[l]] - vol[F_BUS[l]]*vol[T_BUS[l]]*(BFT[l]*cos(ang[F_BUS[l]]-ang[T_BUS[l]])-GFT[l]*sin(ang[F_BUS[l]]-ang[T_BUS[l]]));
+    Qf[l] = -BFF[l]*Vm[F_BUS[l]]*Vm[F_BUS[l]] - Vm[F_BUS[l]]*Vm[T_BUS[l]]*(BFT[l]*cos(Va[F_BUS[l]]-Va[T_BUS[l]])-GFT[l]*sin(Va[F_BUS[l]]-Va[T_BUS[l]]));
 
 subject to reactive_flow_to_2 {l in L:OPF_TYPE='acpolar' and BR_STATUS[l] == 1}:
-    flowqt[l] = -BTT[l]*vol[T_BUS[l]]*vol[T_BUS[l]] - vol[F_BUS[l]]*vol[T_BUS[l]]*(BTF[l]*cos(ang[T_BUS[l]]-ang[F_BUS[l]])-GTF[l]*sin(ang[T_BUS[l]]-ang[F_BUS[l]]));
+    Qt[l] = -BTT[l]*Vm[T_BUS[l]]*Vm[T_BUS[l]] - Vm[F_BUS[l]]*Vm[T_BUS[l]]*(BTF[l]*cos(Va[T_BUS[l]]-Va[F_BUS[l]])-GTF[l]*sin(Va[T_BUS[l]]-Va[F_BUS[l]]));
 
 subject to active_flow_from_3_4 {l in L:(OPF_TYPE='acrect' or OPF_TYPE = 'acjabr') and BR_STATUS[l] == 1}:
-    flowpf[l] = GFF[l]*vol2[F_BUS[l]] + GFT[l]*cosft[l] + BFT[l]*sinft[l];
+    Pf[l] = GFF[l]*V2[F_BUS[l]] + GFT[l]*cosft[l] + BFT[l]*sinft[l];
 
 subject to active_flow_to_3_4 {l in L:(OPF_TYPE='acrect' or OPF_TYPE = 'acjabr') and BR_STATUS[l] == 1}:
-    flowpt[l] = GTT[l]*vol2[T_BUS[l]] + GTF[l]*cosft[l] - BTF[l]*sinft[l];
+    Pt[l] = GTT[l]*V2[T_BUS[l]] + GTF[l]*cosft[l] - BTF[l]*sinft[l];
 
 subject to reactive_flow_from_3_4 {l in L:(OPF_TYPE='acrect' or OPF_TYPE = 'acjabr') and BR_STATUS[l] == 1}:
-    flowqf[l] = -BFF[l]*vol2[F_BUS[l]] - BFT[l]*cosft[l] + GFT[l]*sinft[l];
+    Qf[l] = -BFF[l]*V2[F_BUS[l]] - BFT[l]*cosft[l] + GFT[l]*sinft[l];
 
 subject to reactive_flow_to_3_4 {l in L:(OPF_TYPE='acrect' or OPF_TYPE = 'acjabr') and BR_STATUS[l] == 1}:
-    flowqt[l] = -BTT[l]*vol2[T_BUS[l]] - BTF[l]*cosft[l] - GTF[l]*sinft[l];
+    Qt[l] = -BTT[l]*V2[T_BUS[l]] - BTF[l]*cosft[l] - GTF[l]*sinft[l];
 
 ########## POWER FLOW DEFINITIONS (BR_STATUS = 2) ##########
 
 subject to active_flow_from_1_switch {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 2}:
-    flowpf[l] = status[l] * (1 / BR_X[l]) * (ang[F_BUS[l]] - ang[T_BUS[l]]);
+    Pf[l] = status[l] * (1 / BR_X[l]) * (Va[F_BUS[l]] - Va[T_BUS[l]]);
 
 subject to active_flow_to_1_switch {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 2}:
-    flowpt[l] = status[l] * (1 / BR_X[l]) * (ang[T_BUS[l]] - ang[F_BUS[l]]);
+    Pt[l] = status[l] * (1 / BR_X[l]) * (Va[T_BUS[l]] - Va[F_BUS[l]]);
 
 subject to active_flow_from_2_switch {l in L: OPF_TYPE == 'acpolar' and BR_STATUS[l] == 2}:
-    flowpf[l] = status[l] * (GFF[l]*vol[F_BUS[l]]*vol[F_BUS[l]] + vol[F_BUS[l]]*vol[T_BUS[l]]*(GFT[l]*cos(ang[F_BUS[l]]-ang[T_BUS[l]])+BFT[l]*sin(ang[F_BUS[l]]-ang[T_BUS[l]])));
+    Pf[l] = status[l] * (GFF[l]*Vm[F_BUS[l]]*Vm[F_BUS[l]] + Vm[F_BUS[l]]*Vm[T_BUS[l]]*(GFT[l]*cos(Va[F_BUS[l]]-Va[T_BUS[l]])+BFT[l]*sin(Va[F_BUS[l]]-Va[T_BUS[l]])));
 
 subject to active_flow_to_2_switch {l in L: OPF_TYPE == 'acpolar' and BR_STATUS[l] == 2}:
-    flowpt[l] = status[l] * (GTT[l]*vol[T_BUS[l]]*vol[T_BUS[l]] + vol[F_BUS[l]]*vol[T_BUS[l]]*(GTF[l]*cos(ang[T_BUS[l]]-ang[F_BUS[l]])+BTF[l]*sin(ang[T_BUS[l]]-ang[F_BUS[l]])));
+    Pt[l] = status[l] * (GTT[l]*Vm[T_BUS[l]]*Vm[T_BUS[l]] + Vm[F_BUS[l]]*Vm[T_BUS[l]]*(GTF[l]*cos(Va[T_BUS[l]]-Va[F_BUS[l]])+BTF[l]*sin(Va[T_BUS[l]]-Va[F_BUS[l]])));
 
 subject to reactive_flow_from_2_switch {l in L: OPF_TYPE == 'acpolar' and BR_STATUS[l] == 2}:
-    flowqf[l] = status[l] * (-BFF[l]*vol[F_BUS[l]]*vol[F_BUS[l]] - vol[F_BUS[l]]*vol[T_BUS[l]]*(BFT[l]*cos(ang[F_BUS[l]]-ang[T_BUS[l]])-GFT[l]*sin(ang[F_BUS[l]]-ang[T_BUS[l]])));
+    Qf[l] = status[l] * (-BFF[l]*Vm[F_BUS[l]]*Vm[F_BUS[l]] - Vm[F_BUS[l]]*Vm[T_BUS[l]]*(BFT[l]*cos(Va[F_BUS[l]]-Va[T_BUS[l]])-GFT[l]*sin(Va[F_BUS[l]]-Va[T_BUS[l]])));
 
 subject to reactive_flow_to_2_switch {l in L: OPF_TYPE == 'acpolar' and BR_STATUS[l] == 2}:
-    flowqt[l] = status[l] * (-BTT[l]*vol[T_BUS[l]]*vol[T_BUS[l]] - vol[F_BUS[l]]*vol[T_BUS[l]]*(BTF[l]*cos(ang[T_BUS[l]]-ang[F_BUS[l]])-GTF[l]*sin(ang[T_BUS[l]]-ang[F_BUS[l]])));
+    Qt[l] = status[l] * (-BTT[l]*Vm[T_BUS[l]]*Vm[T_BUS[l]] - Vm[F_BUS[l]]*Vm[T_BUS[l]]*(BTF[l]*cos(Va[T_BUS[l]]-Va[F_BUS[l]])-GTF[l]*sin(Va[T_BUS[l]]-Va[F_BUS[l]])));
 
 subject to active_flow_from_3_4_switch {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 2}:
-    flowpf[l] = status[l] * (GFF[l]*vol2[F_BUS[l]] + GFT[l]*cosft[l] + BFT[l]*sinft[l]);
+    Pf[l] = status[l] * (GFF[l]*V2[F_BUS[l]] + GFT[l]*cosft[l] + BFT[l]*sinft[l]);
 
 subject to active_flow_to_3_4_switch {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 2}:
-    flowpt[l] = status[l] * (GTT[l]*vol2[T_BUS[l]] + GTF[l]*cosft[l] - BTF[l]*sinft[l]);
+    Pt[l] = status[l] * (GTT[l]*V2[T_BUS[l]] + GTF[l]*cosft[l] - BTF[l]*sinft[l]);
 
 subject to reactive_flow_from_3_4_switch {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 2}:
-    flowqf[l] = status[l] * (-BFF[l]*vol2[F_BUS[l]] - BFT[l]*cosft[l] + GFT[l]*sinft[l]);
+    Qf[l] = status[l] * (-BFF[l]*V2[F_BUS[l]] - BFT[l]*cosft[l] + GFT[l]*sinft[l]);
 
 subject to reactive_flow_to_3_4_switch {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 2}:
-    flowqt[l] = status[l] * (-BTT[l]*vol2[T_BUS[l]] - BTF[l]*cosft[l] - GTF[l]*sinft[l]);
+    Qt[l] = status[l] * (-BTT[l]*V2[T_BUS[l]] - BTF[l]*cosft[l] - GTF[l]*sinft[l]);
 
 ########## POWER FLOW DEFINITIONS (BR_STATUS = 3) ##########
 
 subject to active_flow_from_1_bigm {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
-    flowpf_aux[l] = (1 / BR_X[l]) * (ang[F_BUS[l]] - ang[T_BUS[l]]);
+    Pfa[l] = (1 / BR_X[l]) * (Va[F_BUS[l]] - Va[T_BUS[l]]);
 
 subject to active_flow_to_1_bigm {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
-    flowpt_aux[l] = (1 / BR_X[l]) * (ang[T_BUS[l]] - ang[F_BUS[l]]);
+    Pta[l] = (1 / BR_X[l]) * (Va[T_BUS[l]] - Va[F_BUS[l]]);
 
-subject to flowpf_aux_lower_1 {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
-    PFLODC[l] * (1 - status[l]) <= -flowpf[l] + flowpf_aux[l];
+subject to Pfa_lower_1 {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
+    PFLODC[l] * (1 - status[l]) <= -Pf[l] + Pfa[l];
 
-subject to flowpf_aux_upper_1 {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
-    -flowpf[l] + flowpf_aux[l] <= PFUPDC[l] * (1 - status[l]);
+subject to Pfa_upper_1 {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
+    -Pf[l] + Pfa[l] <= PFUPDC[l] * (1 - status[l]);
 
-subject to flowpt_aux_lower_1 {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
-    PFLODC[l] * (1 - status[l]) <= -flowpt[l] + flowpt_aux[l];
+subject to Pta_lower_1 {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
+    PFLODC[l] * (1 - status[l]) <= -Pt[l] + Pta[l];
 
-subject to flowpt_aux_upper_1 {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
-    -flowpt[l] + flowpt_aux[l] <= PFUPDC[l] * (1 - status[l]);
+subject to Pta_upper_1 {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
+    -Pt[l] + Pta[l] <= PFUPDC[l] * (1 - status[l]);
 
 subject to active_flow_from_2_bigm {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
-    flowpf_aux[l] = GFF[l] * vol2[F_BUS[l]] + GFT[l] * cosft[l] + BFT[l] * sinft[l];
+    Pfa[l] = GFF[l] * V2[F_BUS[l]] + GFT[l] * cosft[l] + BFT[l] * sinft[l];
 
 subject to active_flow_to_2_bigm {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
-    flowpt_aux[l] = GTT[l] * vol2[T_BUS[l]] + GTF[l] * cosft[l] - BTF[l] * sinft[l];
+    Pta[l] = GTT[l] * V2[T_BUS[l]] + GTF[l] * cosft[l] - BTF[l] * sinft[l];
 
 subject to reactive_flow_from_2_bigm {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
-    flowqf_aux[l] = -BFF[l] * vol2[F_BUS[l]] - BFT[l] * cosft[l] + GFT[l] * sinft[l];
+    Qfa[l] = -BFF[l] * V2[F_BUS[l]] - BFT[l] * cosft[l] + GFT[l] * sinft[l];
 
 subject to reactive_flow_to_2_bigm {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
-    flowqt_aux[l] = -BTT[l] * vol2[T_BUS[l]] - BTF[l] * cosft[l] - GTF[l] * sinft[l];
+    Qta[l] = -BTT[l] * V2[T_BUS[l]] - BTF[l] * cosft[l] - GTF[l] * sinft[l];
 
-subject to flowpf_aux_lower_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
-    PFLOAC[l] * (1 - status[l]) <= -flowpf[l] + flowpf_aux[l];
+subject to Pfa_lower_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+    PFLOAC[l] * (1 - status[l]) <= -Pf[l] + Pfa[l];
 
-subject to flowpf_aux_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
-    -flowpf[l] + flowpf_aux[l] <= PFUPAC[l] * (1 - status[l]);
+subject to Pfa_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+    -Pf[l] + Pfa[l] <= PFUPAC[l] * (1 - status[l]);
 
-subject to flowpt_aux_lower_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
-    PTLOAC[l] * (1 - status[l]) <= -flowpt[l] + flowpt_aux[l];
+subject to Pta_lower_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+    PTLOAC[l] * (1 - status[l]) <= -Pt[l] + Pta[l];
 
-subject to flowpt_aux_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
-    -flowpt[l] + flowpt_aux[l] <= PTUPAC[l] * (1 - status[l]);
+subject to Pta_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+    -Pt[l] + Pta[l] <= PTUPAC[l] * (1 - status[l]);
 
-subject to flowqf_aux_lower_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
-    QFLOAC[l] * (1 - status[l]) <= -flowqf[l] + flowqf_aux[l];
+subject to Qfa_lower_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+    QFLOAC[l] * (1 - status[l]) <= -Qf[l] + Qfa[l];
 
-subject to flowqf_aux_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
-    -flowqf[l] + flowqf_aux[l] <= QFUPAC[l] * (1 - status[l]);
+subject to Qfa_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+    -Qf[l] + Qfa[l] <= QFUPAC[l] * (1 - status[l]);
 
-subject to flowqt_aux_lower_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
-    QTLOAC[l] * (1 - status[l]) <= -flowqt[l] + flowqt_aux[l];
+subject to Qta_lower_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+    QTLOAC[l] * (1 - status[l]) <= -Qt[l] + Qta[l];
 
-subject to flowqt_aux_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
-    -flowqt[l] + flowqt_aux[l] <= QTUPAC[l] * (1 - status[l]);
+subject to Qta_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+    -Qt[l] + Qta[l] <= QTUPAC[l] * (1 - status[l]);
 
 ########## POWER FLOW LIMITS ##########
 
 subject to flowf_limits_1 {l in L:OPF_TYPE='dc' and (BR_STATUS[l] == 1 or BR_STATUS[l] == 2)}:
-    -RATE_A[l] <= flowpf[l] <= RATE_A[l];
+    -RATE_A[l] <= Pf[l] <= RATE_A[l];
 
 subject to flowt_limits_1 {l in L:OPF_TYPE='dc' and (BR_STATUS[l] == 1 or BR_STATUS[l] == 2)}:
-    -RATE_A[l] <= flowpt[l] <= RATE_A[l];
+    -RATE_A[l] <= Pt[l] <= RATE_A[l];
 
 subject to flowf_limits_dc_lower {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
-    flowpf[l] >= -RATE_A[l] * status[l];
+    Pf[l] >= -RATE_A[l] * status[l];
 
 subject to flowf_limits_dc_upper {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
-    flowpf[l] <= RATE_A[l] * status[l];
+    Pf[l] <= RATE_A[l] * status[l];
 
 subject to flowt_limits_dc_lower {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
-    flowpt[l] >= -RATE_A[l] * status[l];
+    Pt[l] >= -RATE_A[l] * status[l];
 
 subject to flowt_limits_dc_upper {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
-    flowpt[l] <= RATE_A[l] * status[l];
+    Pt[l] <= RATE_A[l] * status[l];
 
 subject to flow_limits_from_23_4 {l in L:(OPF_TYPE='acpolar' or OPF_TYPE = 'acrect' or OPF_TYPE = 'acjabr') and (BR_STATUS[l] == 1 or BR_STATUS[l] == 2)}:
-    flowpf[l]^2 + flowqf[l]^2 <= RATE_A[l]^2;
+    Pf[l]^2 + Qf[l]^2 <= RATE_A[l]^2;
 
 subject to flow_limits_to_23_4 {l in L:(OPF_TYPE='acpolar' or OPF_TYPE = 'acrect' or OPF_TYPE = 'acjabr') and (BR_STATUS[l] == 1 or BR_STATUS[l] == 2)}:
-    flowpt[l]^2 + flowqt[l]^2 <= RATE_A[l]^2;
+    Pt[l]^2 + Qt[l]^2 <= RATE_A[l]^2;
 
 subject to flow_limits_from_acrect {l in L: (OPF_TYPE == 'acpolar' or OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
-    flowpf[l]^2 + flowqf[l]^2 <= RATE_A[l]^2 * status[l];
+    Pf[l]^2 + Qf[l]^2 <= RATE_A[l]^2 * status[l];
 
 subject to flow_limits_to_acrect {l in L: (OPF_TYPE == 'acpolar' or OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
-    flowpt[l]^2 + flowqt[l]^2 <= RATE_A[l]^2 * status[l];
+    Pt[l]^2 + Qt[l]^2 <= RATE_A[l]^2 * status[l];
 
 ########## RECTANGULAR DEFINITIONS ##########
 
 subject to eq_vol_squared {n in N:OPF_TYPE = 'acrect'}:
-    vol2[n] == volr[n]*volr[n] + voli[n]*voli[n];
+    V2[n] == Vr[n]*Vr[n] + Vi[n]*Vi[n];
 
 subject to eq_cosft {l in L:OPF_TYPE = 'acrect'}:
-    cosft[l] == volr[F_BUS[l]]*volr[T_BUS[l]] + voli[F_BUS[l]]*voli[T_BUS[l]];
+    cosft[l] == Vr[F_BUS[l]]*Vr[T_BUS[l]] + Vi[F_BUS[l]]*Vi[T_BUS[l]];
 
 subject to eq_sinft {l in L:OPF_TYPE = 'acrect'}:
-    sinft[l] == voli[F_BUS[l]]*volr[T_BUS[l]] - volr[F_BUS[l]]*voli[T_BUS[l]];
+    sinft[l] == Vi[F_BUS[l]]*Vr[T_BUS[l]] - Vr[F_BUS[l]]*Vi[T_BUS[l]];
 
 ########## JABR RELAXATION ##########
 
 subject to jabr_relaxation_ft {l in L:OPF_TYPE = 'acrect' or OPF_TYPE = 'acjabr'}:
-    cosft[l]^2 + sinft[l]^2 <= vol2[F_BUS[l]]*vol2[T_BUS[l]];
+    cosft[l]^2 + sinft[l]^2 <= V2[F_BUS[l]]*V2[T_BUS[l]];
 
 # TODO: Add the relaxation by Muñoz where losses are positive?
 
 ########## SLACK BUS ##########
 
 subject to eq_slack:
-    ang[0] == 0;
+    Va[0] == 0;
 
 subject to eq_slack_imag:
-    voli[0] == 0;
+    Vi[0] == 0;
 
 ########## CONNECTIVITY CONSTRAINTS ##########
 
