@@ -22,7 +22,8 @@ jobs:
         python -m pip install amplpy --upgrade
         python -m amplpy.modules install base highs
         python -m amplpy.modules activate ${{ secrets.AMPL_UUID }}
-        echo "AMPL_PATH=$(which ampl)" >> $GITHUB_ENV
+        AMPL_MODULES_DIR=$(python -c "import amplpy.modules; print(amplpy.modules.get_modules_directory())")
+        echo "::add-path::$AMPL_MODULES_DIR"
     - name: test
       env:
         TOXPYTHON: 'python3.11'
