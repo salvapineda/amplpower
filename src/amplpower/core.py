@@ -347,23 +347,23 @@ class PowerSystem:
 
         if solver_status == "solved" or solver_status == "limit":
             # Get the generation results
-            Pg = ampl.get_variable("genp").get_values().to_pandas().values.flatten()
-            Qg = ampl.get_variable("genq").get_values().to_pandas().values.flatten()
+            Pg = ampl.get_variable("Pg").get_values().to_pandas().values.flatten()
+            Qg = ampl.get_variable("Qg").get_values().to_pandas().values.flatten()
             Pg_ls = np.minimum(Pg - self.generators["PMIN"].values, 0)
             Pg_us = np.maximum(Pg - self.generators["PMAX"].values, 0)
             Qg_ls = np.minimum(Qg - self.generators["QMIN"].values, 0)
             Qg_us = np.maximum(Qg - self.generators["QMAX"].values, 0)
             gen_df = pd.DataFrame(
                 {"Pg": Pg, "Qg": Qg, "Pg_ls": Pg_ls, "Pg_us": Pg_us, "Qg_ls": Qg_ls, "Qg_us": Qg_us},
-                index=ampl.get_variable("genp").get_values().to_pandas().index,
+                index=ampl.get_variable("Pg").get_values().to_pandas().index,
             )
 
             # Get the line results
             switching = ampl.get_variable("status").get_values().to_pandas().values.flatten()
-            Pf = ampl.get_variable("flowpf").get_values().to_pandas().values.flatten()
-            Pt = ampl.get_variable("flowpt").get_values().to_pandas().values.flatten()
-            Qf = ampl.get_variable("flowqf").get_values().to_pandas().values.flatten()
-            Qt = ampl.get_variable("flowqt").get_values().to_pandas().values.flatten()
+            Pf = ampl.get_variable("Pf").get_values().to_pandas().values.flatten()
+            Pt = ampl.get_variable("Pt").get_values().to_pandas().values.flatten()
+            Qf = ampl.get_variable("Qf").get_values().to_pandas().values.flatten()
+            Qt = ampl.get_variable("Qt").get_values().to_pandas().values.flatten()
             Sf = Pf + 1j * Qf
             St = Pt + 1j * Qt
             Sf_us = np.maximum(abs(Sf) - self.branches["RATE_A"].values, 0)
@@ -385,12 +385,12 @@ class PowerSystem:
 
             # Get the voltage results
             if opf_type == "acrect":
-                volr = ampl.get_variable("volr").get_values().to_pandas().values.flatten()
-                voli = ampl.get_variable("voli").get_values().to_pandas().values.flatten()
+                volr = ampl.get_variable("Vr").get_values().to_pandas().values.flatten()
+                voli = ampl.get_variable("Vi").get_values().to_pandas().values.flatten()
                 Vm = np.sqrt(volr**2 + voli**2)
                 Va = np.arctan2(voli, volr)
             elif opf_type == "acjabr":
-                vol2 = ampl.get_variable("vol2").get_values().to_pandas().values.flatten()
+                vol2 = ampl.get_variable("V2").get_values().to_pandas().values.flatten()
                 Vm = np.sqrt(vol2)
                 vfvtcosft = ampl.get_variable("cosft").get_values().to_pandas().values.flatten()
                 vfvt = np.array([Vm[int(self.branches.loc[i, "F_BUS"])] * Vm[int(self.branches.loc[i, "T_BUS"])] for i in range(self.nlin)])
@@ -411,8 +411,8 @@ class PowerSystem:
                             Va[f_bus] = Va[t_bus] - np.arccos(cosft[line_index])
                             visited.add(f_bus)
             else:
-                Vm = ampl.get_variable("vol").get_values().to_pandas().values.flatten()
-                Va = ampl.get_variable("ang").get_values().to_pandas().values.flatten()
+                Vm = ampl.get_variable("Vm").get_values().to_pandas().values.flatten()
+                Va = ampl.get_variable("Va").get_values().to_pandas().values.flatten()
             Vm_ls = np.minimum(Vm - self.buses["VMIN"].values, 0)
             Vm_us = np.maximum(Vm - self.buses["VMAX"].values, 0)
             Va_ls = np.minimum(Va - self.buses["AMIN"].values, 0)
@@ -435,7 +435,7 @@ class PowerSystem:
                     "P_slack": P_slack,
                     "Q_slack": Q_slack,
                 },
-                index=ampl.get_variable("vol").get_values().to_pandas().index,
+                index=ampl.get_variable("Vm").get_values().to_pandas().index,
             )
 
             return {
