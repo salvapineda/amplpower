@@ -17,6 +17,7 @@ jobs:
         pip --version
         tox --version
         pip list --format=freeze
+        python -m amplpy.modules install highs
     - name: test
       env:
         TOXPYTHON: 'python3.11'
