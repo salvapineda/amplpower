@@ -20,7 +20,7 @@ jobs:
     - name: install AMPL
       run: |
         python -m pip install amplpy --upgrade
-        python -m amplpy.modules install base highs ipopt
+        python -m amplpy.modules install base highs
         python -m amplpy.modules activate ${{ secrets.AMPL_UUID }}
         echo "AMPL_PATH=$(which ampl)" >> $GITHUB_ENV
     - name: test
