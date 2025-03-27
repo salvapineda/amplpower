@@ -1,5 +1,5 @@
 # Use any image as base image
-FROM debian:stable-slim
+FROM ubuntu:22.04
 # Install curl in order to download the modules necessary
 RUN apt-get update && apt-get install -y curl python3 python3-pip python3-venv
 
