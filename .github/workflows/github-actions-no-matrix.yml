@@ -3,7 +3,11 @@ on: [push, pull_request, workflow_dispatch]
 jobs:
   test:
     runs-on: ubuntu-latest
-    container: ghcr.io/salvapineda/amplpower-base:latest
+    container:
+      image: ghcr.io/salvapineda/amplpower-base:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GHCR_PAT }}
     steps:
     - uses: actions/checkout@v4
       with:
