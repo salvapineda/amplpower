@@ -13,7 +13,7 @@ To use the project:
     ps = PowerSystem("case9.m")
 
     # Solve the DC OPF
-    results = ps.solve_opf(opf_type='dc', switching='off', connectivity='off', solver='gurobi'')
+    results = ps.solve_opf(opf_type='dc', switching='off', connectivity='off', solver='gurobi')
 
     # Solve the AC OPF (rectangular formulation)
     results = ps.solve_opf(opf_type='acrect', switching='off', connectivity='off', solver='gurobi')
