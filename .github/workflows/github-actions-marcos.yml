@@ -39,7 +39,7 @@ jobs:
         run: |
           set -xv
           python -m pip install amplpy --upgrade
-          python -m amplpy.modules install gurobi highs coin # coin includes cbc, ipopt and couenne
+          python -m amplpy.modules install gurobi highs coin scip
           python -m amplpy.modules activate ${{ secrets.AMPL_UUID }}
 
       - name: Install amplpower
