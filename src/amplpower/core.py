@@ -4,12 +4,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from amplpy import AMPL
-from amplpy import add_to_path
 from matpowercaseframes import CaseFrames
 from scipy.optimize import minimize
-
-add_to_path(r"/opt/ampl/")
-
 
 def compute(args):
     return max(args, key=len)
