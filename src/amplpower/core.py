@@ -4,12 +4,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from amplpy import AMPL
-from amplpy import add_to_path
 from matpowercaseframes import CaseFrames
 from scipy.optimize import minimize
-
-add_to_path(r"/opt/ampl/")
-
 
 def compute(args):
     return max(args, key=len)
@@ -324,7 +320,6 @@ class PowerSystem:
             f"=======Solving OPF ({opf_type}) with switching {switching} and connectivity {connectivity} with solver {solver} and options {options}"
         )
         ampl = AMPL()
-        ampl.reset()
         ampl.read(Path(__file__).parent / "opf.mod")
 
         ampl.set_data(self.buses, "N")
@@ -341,6 +336,10 @@ class PowerSystem:
         ampl.param["MINVOL"] = self.min_voltage
 
         ampl.option["mp_options"] = options
+        if solver != 'ipopt': # ipopt is not an MP solver but ASL
+            ampl.option["ipopt_options"] = options
+        else:
+            ampl.option["mp_options"] = options
         ampl.solve(solver=solver)
         solver_status = ampl.solve_result
 
