@@ -17,9 +17,15 @@ jobs:
         pip --version
         tox --version
         pip list --format=freeze
-        python -m amplpy.modules install highs
+    - name: Setup amplpy modules
+      run: |
+        set -xv
+        python -m pip install amplpy --upgrade
+        python -m amplpy.modules install gurobi highs coin
         python -m amplpy.modules activate ${{ secrets.AMPL_UUID }}
-        python -m amplpy.modules run ampl -vvq
+    - name: Install amplpower
+      run: |
+        python -m pip install .
     - name: test
       env:
         TOXPYTHON: 'python3.11'
