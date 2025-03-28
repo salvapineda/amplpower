@@ -68,7 +68,7 @@ def test_power_plants_example():
     ampl = AMPL()
     ampl.reset()
     # Read model
-    ampl.read('test_data/example.mod')
+    ampl.read('./tests/test_data/example.mod')
     # Get data
     power_plants, demand = example_data()
     # Load pandas data into AMPL
