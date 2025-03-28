@@ -31,12 +31,10 @@ def test_opf(opf_type, solver):
 @pytest.mark.parametrize("opf_type", ["dc", "acjabr", "acrect", "acpolar"])
 @pytest.mark.parametrize("switching", ["bigm", "nl"])
 def test_ots(opf_type, switching):
-    if opf_type == "dc" and switching == "bigm":
-        solver = "highs"
-    else:
-        solver = "scip"
     ps = PowerSystem("./src/amplpower/data/case9_switching.m")
-    results = ps.solve_opf(opf_type=opf_type, switching=switching, connectivity="off", solver=solver, options="outlev=1 timelimit=5")
+    results = ps.solve_opf(
+        opf_type=opf_type, switching=switching, connectivity="off", solver="scip", options="outlev=1 timelimit=5 lim:gap=1e-6"
+    )
     print(f"Objective function value: {results['obj']}")
     print(f"Time: {results['time']}")
     print(results["gen"])
