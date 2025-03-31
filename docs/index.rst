@@ -6,13 +6,13 @@ Contents
    :maxdepth: 2
 
    readme
+   formulations
    installation
    usage
    reference/index
    contributing
    authors
    changelog
-   formulations  # Updated this line
 
 Indices and tables
 ==================

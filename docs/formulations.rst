@@ -7,91 +7,100 @@ This section provides an overview of the formulations and optimization models us
 Nomenclature
 ------------
 
-### Indexes
-- **\( i, j \)**: Buses.
-- **\( g \)**: Generators.
-- **\( l \)**: Transmission lines.
+Indexes
+~~~~~~~
+.. list-table::
+   :widths: 20 80
+   :header-rows: 0
 
-### Parameters
-- **\( S_{\text{base}} \)**: Base power in MVA.
-- **\( P_{D,i} \)**: Active power demand at bus \( i \) (MW).
-- **\( \theta_{\text{max}}, \theta_{\text{min}} \)**: Voltage angle limits (radians).
-- **\( P_{g,\text{max}}, P_{g,\text{min}} \)**: Active power generation limits for generator \( g \) (MW).
-- **\( c_{2,g}, c_{1,g}, c_{0,g} \)**: Quadratic, linear, and constant cost coefficients for generator \( g \).
-- **\( x_l \)**: Reactance of line \( l \) (p.u.).
-- **\( f_l, t_l \)**: From and to buses of line \( l \).
+   * - :math:`n, m`
+     - Bus indices
+   * - :math:`g`
+     - Generator index
+   * - :math:`l`
+     - Transmission line index
 
-### Variables
-- **\( P_g \)**: Active power generation of generator \( g \) (MW).
-- **\( \theta_i \)**: Voltage angle at bus \( i \) (radians).
-- **\( P_{f,l}, P_{t,l} \)**: Active power flow on line \( l \) from the "from" and "to" ends (MW).
+Parameters
+~~~~~~~~~~
+.. list-table::
+   :widths: 20 80
+   :header-rows: 0
 
-Formulations
-------------
+   * - :math:`S_{\text{base}}`
+     - Base power [MVA]
+   * - :math:`P^D_n`
+     - Active power demand at bus :math:`n` [MW]
+   * - :math:`\theta_{\text{max}}, \theta_{\text{min}}`
+     - Voltage angle limits [radians]
+   * - :math:`\overline{P}_g, \underline{P}_g`
+     - Generation limits for :math:`g` [MW]
+   * - :math:`c_{2,g}, c_{1,g}, c_{0,g}`
+     - Cost coefficients for :math:`g`
+   * - :math:`x_l`
+     - Reactance of line :math:`l` [p.u.]
+   * - :math:`\overline{P}_l`
+     - Line capacity for :math:`l` [MW]
+   * - :math:`C^F_{l,n}, C^T_{l,n}`
+     - Incidence matrices for "from" and "to" buses of line :math:`l`
+   * - :math:`C^G_{g,n}`
+     - Incidence matrix for generator :math:`g` at bus :math:`n`
 
-- **P**: Active power (MW)
-- **Q**: Reactive power (MVAR)
-- **V**: Voltage magnitude (p.u.)
-- **θ**: Voltage angle (radians)
-- **Y**: Admittance matrix
+Variables
+~~~~~~~~~
+.. list-table::
+   :widths: 20 80
+   :header-rows: 0
 
-Optimization Models
--------------------
-
-1. **AC Optimal Power Flow (AC-OPF)**:
-   - Solves the full nonlinear power flow equations.
-   - Objective: Minimize generation cost or losses.
-
-2. **DC Optimal Power Flow (DC-OPF)**:
-   - Linearized version of the AC-OPF.
-   - Assumes small angle differences and constant voltage magnitudes.
+   * - :math:`P_g`
+     - Active power generation of :math:`g` [MW]
+   * - :math:`\theta_n`
+     - Voltage angle at bus :math:`n` [radians]
+   * - :math:`P^F_l, P^T_l`
+     - Power flow on line :math:`l` (from/to) [MW]
 
 DC Optimal Power Flow (DC-OPF)
 ------------------------------
 
 The DC-OPF formulation is a simplified version of the AC-OPF that assumes:
+
 - Voltage magnitudes are fixed at 1.0 p.u.
 - Reactive power flows are ignored.
 - Small angle differences between buses.
 
-### Objective Function
+Objective Function
+~~~~~~~~~~~~~~~~~
 The objective is to minimize the total generation cost:
-\[
-\text{Minimize: } \sum_{g} \left( c_{2,g} \cdot P_g^2 + c_{1,g} \cdot P_g + c_{0,g} \right)
-\]
 
-### Constraints
+.. math::
+   \text{Minimize: } \sum_{g} \left( c_{2,g} \cdot P_g^2 + c_{1,g} \cdot P_g + c_{0,g} \right)
+
+Constraints
+~~~~~~~~~~~
 
 1. **Active Power Balance**:
-   For each bus \( i \):
-   \[
-   \sum_{g} P_g \cdot \delta_{g,i} - P_{D,i} = \sum_{l} \left( P_{f,l} \cdot \delta_{f_l,i} + P_{t,l} \cdot \delta_{t_l,i} \right)
-   \]
-   where \( \delta_{g,i} \), \( \delta_{f_l,i} \), and \( \delta_{t_l,i} \) are incidence indicators.
+
+   .. math::
+      \sum_{g} C^G_{g,n} \cdot P_g - P^D_n = \sum_{l} \left( C^F_{l,n} \cdot P^F_l + C^T_{l,n} \cdot P^T_l \right), \quad \forall n
 
 2. **Line Flow Equations**:
-   For each line \( l \):
-   \[
-   P_{f,l} = \frac{1}{x_l} \cdot \left( \theta_{f_l} - \theta_{t_l} \right)
-   \]
-   \[
-   P_{t,l} = \frac{1}{x_l} \cdot \left( \theta_{t_l} - \theta_{f_l} \right)
-   \]
 
-3. **Generator Limits**:
-   For each generator \( g \):
-   \[
-   P_{g,\text{min}} \leq P_g \leq P_{g,\text{max}}
-   \]
+   .. math::
+      P^F_l = \frac{1}{x_l} \cdot \sum_{n} \left( C^F_{l,n} - C^T_{l,n} \right) \cdot \theta_n, \quad \forall l
 
-4. **Voltage Angle Reference**:
-   The voltage angle at the slack bus is fixed:
-   \[
-   \theta_{\text{slack}} = 0
-   \]
+   .. math::
+      P^T_l = \frac{1}{x_l} \cdot \sum_{n} \left( C^T_{l,n} - C^F_{l,n} \right) \cdot \theta_n, \quad \forall l
 
-3. **Security-Constrained OPF (SC-OPF)**:
-   - Includes contingency constraints for system reliability.
-   - Ensures the system operates securely under predefined contingencies.
+3. **Line Flow Limits**:
 
-Feel free to expand this section with additional formulations or constraints as needed.
+   .. math::
+      -\overline{P}_l \leq P^F_l, P^T_l \leq \overline{P}_l, \quad \forall l
+
+4. **Generator Limits**:
+
+   .. math::
+      \underline{P}_g \leq P_g \leq \overline{P}_g, \quad \forall g
+
+5. **Voltage Angle Reference**:
+
+   .. math::
+      \theta_{\text{slack}} = 0
