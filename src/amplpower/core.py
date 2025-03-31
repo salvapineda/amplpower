@@ -345,12 +345,18 @@ class PowerSystem:
             # Get the generation results
             Pg = ampl.get_variable("Pg").get_values().to_pandas().values.flatten()
             Qg = ampl.get_variable("Qg").get_values().to_pandas().values.flatten()
-            Pg_ls = np.minimum(Pg - self.generators["PMIN"].values, 0)
-            Pg_us = np.maximum(Pg - self.generators["PMAX"].values, 0)
-            Qg_ls = np.minimum(Qg - self.generators["QMIN"].values, 0)
-            Qg_us = np.maximum(Qg - self.generators["QMAX"].values, 0)
+            Pg_viol = (
+                100
+                * np.maximum(0, Pg - self.generators["PMAX"].values, self.generators["PMIN"].values - Pg)
+                / (self.generators["PMAX"].values - self.generators["PMIN"].values)
+            )
+            Qg_viol = (
+                100
+                * np.maximum(0, Qg - self.generators["QMAX"].values, self.generators["QMIN"].values - Qg)
+                / (self.generators["QMAX"].values - self.generators["QMIN"].values)
+            )
             gen_df = pd.DataFrame(
-                {"Pg": Pg, "Qg": Qg, "Pg_ls": Pg_ls, "Pg_us": Pg_us, "Qg_ls": Qg_ls, "Qg_us": Qg_us},
+                {"Pg": Pg, "Qg": Qg, "Pg_viol": Pg_viol, "Qg_viol": Qg_viol},
                 index=ampl.get_variable("Pg").get_values().to_pandas().index,
             )
 
@@ -362,8 +368,16 @@ class PowerSystem:
             Qt = ampl.get_variable("Qt").get_values().to_pandas().values.flatten()
             Sf = Pf + 1j * Qf
             St = Pt + 1j * Qt
-            Sf_us = np.maximum(abs(Sf) - self.branches["RATE_A"].values, 0)
-            St_us = np.maximum(abs(St) - self.branches["RATE_A"].values, 0)
+            Sf_viol = (
+                100
+                * np.maximum(0, abs(Sf) - self.branches["RATE_A"].values, -self.branches["RATE_A"].values - abs(Sf))
+                / (2 * self.branches["RATE_A"].values)
+            )
+            St_viol = (
+                100
+                * np.maximum(0, abs(St) - self.branches["RATE_A"].values, -self.branches["RATE_A"].values - abs(St))
+                / (2 * self.branches["RATE_A"].values)
+            )
             line_df = pd.DataFrame(
                 {
                     "switching": switching,
@@ -373,8 +387,8 @@ class PowerSystem:
                     "Qt": Qt,
                     "Sf": abs(Sf),
                     "St": abs(St),
-                    "Sf_us": Sf_us,
-                    "St_us": St_us,
+                    "Sf_viol": Sf_viol,
+                    "St_viol": St_viol,
                 },
                 index=ampl.get_variable("status").get_values().to_pandas().index,
             )
@@ -409,27 +423,31 @@ class PowerSystem:
             else:
                 Vm = ampl.get_variable("Vm").get_values().to_pandas().values.flatten()
                 Va = ampl.get_variable("Va").get_values().to_pandas().values.flatten()
-            Vm_ls = np.minimum(Vm - self.buses["VMIN"].values, 0)
-            Vm_us = np.maximum(Vm - self.buses["VMAX"].values, 0)
-            Va_ls = np.minimum(Va - self.buses["AMIN"].values, 0)
-            Va_us = np.maximum(Va - self.buses["AMAX"].values, 0)
+            Vm_viol = (
+                100
+                * np.maximum(0, Vm - self.buses["VMAX"].values, self.buses["VMIN"].values - Vm)
+                / (self.buses["VMAX"].values - self.buses["VMIN"].values)
+            )
+            Va_viol = (
+                100
+                * np.maximum(0, Va - self.buses["AMAX"].values, self.buses["AMIN"].values - Va)
+                / (self.buses["AMAX"].values - self.buses["AMIN"].values)
+            )
             # Computation of power injections
             Sd = self.buses["PD"].values + 1j * self.buses["QD"].values
             Sg = Pg + 1j * Qg
             Ssh = self.buses["GS"].values * Vm**2 - 1j * self.buses["BS"].values * Vm**2
-            S_slack = Sg @ self.cg - Sd - Ssh - Sf @ self.cf - St @ self.ct
-            P_slack = np.real(S_slack)
-            Q_slack = np.imag(S_slack)
+            S_viol = Sg @ self.cg - Sd - Ssh - Sf @ self.cf - St @ self.ct
+            P_viol = 100 * np.real(S_viol) / sum(self.buses["PD"].values)
+            Q_viol = 100 * np.imag(S_viol) / sum(self.buses["QD"].values)
             bus_df = pd.DataFrame(
                 {
                     "Vm": Vm,
                     "Va": Va,
-                    "Vm_ls": Vm_ls,
-                    "Vm_us": Vm_us,
-                    "Va_ls": Va_ls,
-                    "Va_us": Va_us,
-                    "P_slack": P_slack,
-                    "Q_slack": Q_slack,
+                    "Vm_viol": Vm_viol,
+                    "Va_viol": Va_viol,
+                    "P_viol": P_viol,
+                    "Q_viol": Q_viol,
                 },
                 index=ampl.get_variable("Vm").get_values().to_pandas().index,
             )
