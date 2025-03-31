@@ -12,6 +12,7 @@ Contents
    contributing
    authors
    changelog
+   formulations  # Updated this line
 
 Indices and tables
 ==================
