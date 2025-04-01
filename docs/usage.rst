@@ -2,7 +2,7 @@
 Usage
 =====
 
-To use the project:
+To use the project, follow these steps:
 
 .. code-block:: python
 
@@ -12,26 +12,16 @@ To use the project:
     # Load the case file
     ps = PowerSystem("case9.m")
 
-    # Solve the DC OPF
-    results = ps.solve_opf(opf_type='dc', switching='off', connectivity='off', solver='gurobi'')
+    # Solve different types of Optimal Power Flow (OPF):
 
-    # Solve the AC OPF (rectangular formulation)
-    results = ps.solve_opf(opf_type='acrect', switching='off', connectivity='off', solver='gurobi')
+    # 1. Solve the DC OPF
+    dc_results = ps.solve_opf(opf_type='dc')
 
-    # Solve the AC OPF (polar formulation)
-    results = ps.solve_opf(opf_type='acpolar', switching='off', connectivity='off', solver='gurobi')
+    # 2. Solve the AC OPF (polar formulation)
+    acpolar_results = ps.solve_opf(opf_type='acpolar')
 
-    # Solve the Jabr OPF relaxation
-    results = ps.solve_opf(opf_type='acjabr', switching='off', connectivity='off', solver='gurobi')
+    # 3. Solve the AC OPF (rectangular formulation)
+    acrect_results = ps.solve_opf(opf_type='acrect')
 
-    # Solve the DC OTS using the bigM formulation without imposing connectivity constraints
-    results = ps.solve_ots(ots_type='dc', switching='bigm', connectivity='off', solver='gurobi')
-
-    # Solve the DC OTS using the non-linear formulation without imposing connectivity constraints
-    results = ps.solve_ots(ots_type='dc', switching='nl', connectivity='off', solver='gurobi')
-
-    # Solve the DC OTS using the bigM formulation and imposing connectivity constraints
-    results = ps.solve_ots(ots_type='dc', switching='bigm', connectivity='on', solver='gurobi')
-
-    # Solve the DC OTS using the non-linear formulation and imposing connectivity constraints
-    results = ps.solve_ots(ots_type='dc', switching='nl', connectivity='on', solver='gurobi')
+    # 4. Solve the Jabr OPF relaxation
+    acjabr_results = ps.solve_opf(opf_type='acjabr')

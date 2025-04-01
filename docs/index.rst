@@ -6,7 +6,11 @@ Contents
    :maxdepth: 2
 
    readme
-   formulations
+   nomenclature
+   opf_dc
+   opf_acpolar
+   opf_acrect
+   opf_acjabr
    installation
    usage
    reference/index
