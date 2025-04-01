@@ -341,7 +341,7 @@ class PowerSystem:
         ampl.solve(solver=solver)
         solver_status = ampl.solve_result
 
-        if solver_status == "solved" or solver_status == "limit":
+        try:
             # Get the generation results
             Pg = ampl.get_variable("Pg").get_values().to_pandas().values.flatten()
             Qg = ampl.get_variable("Qg").get_values().to_pandas().values.flatten()
@@ -461,5 +461,6 @@ class PowerSystem:
                 "status": "solved",
             }
 
-        else:
+        except Exception:
+            print("=======Error: No solution found:")
             return {"obj": None, "time": None, "gen": None, "bus": None, "lin": None, "status": solver_status}

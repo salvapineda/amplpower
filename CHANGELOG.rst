@@ -1,8 +1,13 @@
 Changelog
 =========
 
+0.0.11 (2025-04-01)
+-------------------
+
+* Return results for any status
+
 0.0.10 (2025-04-01)
-------------------
+-------------------
 
 * Add formulations of OPF to docs
 
