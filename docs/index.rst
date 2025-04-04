@@ -14,6 +14,7 @@ Contents
    installation
    usage
    reference/index
+   ampl_model
    contributing
    authors
    changelog

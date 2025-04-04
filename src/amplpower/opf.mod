@@ -1,6 +1,11 @@
+########## SETS ##########
+
 set N;
 set G;
 set L;
+
+########## PARAMETERS ##########
+
 param OPF_TYPE symbolic;
 param CONNECTIVITY symbolic;
 param BASEMVA;
@@ -99,6 +104,8 @@ param COSFTMAX {L};
 param COSFTMIN {L};
 param SINFTMAX {L};
 param SINFTMIN {L};
+
+########## VARIABLES ##########
 
 var Pg {g in G} >= PMIN[g], <= PMAX[g]:= PG0[g];
 var Qg {g in G} >= QMIN[g], <= QMAX[g]:= QG0[g];
