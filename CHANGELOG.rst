@@ -1,6 +1,11 @@
 Changelog
 =========
 
+0.0.16 (2025-04-04)
+-------------------
+
+* Modification of default Bigm values for AC OTS.
+
 0.0.15 (2025-04-04)
 -------------------
 

@@ -152,15 +152,14 @@ class PowerSystem:
         self.branches["PFLODC"] = (1 / self.branches["BR_X"]) * (self.cf @ self.buses["AMIN"] - self.ct @ self.buses["AMAX"])
 
         # Initialize Big-M values for AC power flow
-        max_rate_a = self.branches["RATE_A"].max()
-        self.branches["PFUPAC"] = max_rate_a
-        self.branches["PFLOAC"] = -max_rate_a
-        self.branches["PTUPAC"] = max_rate_a
-        self.branches["PTLOAC"] = -max_rate_a
-        self.branches["QFUPAC"] = max_rate_a
-        self.branches["QFLOAC"] = -max_rate_a
-        self.branches["QTUPAC"] = max_rate_a
-        self.branches["QTLOAC"] = -max_rate_a
+        self.branches["PFUPAC"] = self.branches["PFUPDC"]
+        self.branches["PFLOAC"] = self.branches["PFLODC"]
+        self.branches["PTUPAC"] = self.branches["PFUPDC"]
+        self.branches["PTLOAC"] = self.branches["PFLODC"]
+        self.branches["QFUPAC"] = self.branches["PFUPDC"]
+        self.branches["QFLOAC"] = self.branches["PFLODC"]
+        self.branches["QTUPAC"] = self.branches["PFUPDC"]
+        self.branches["QTLOAC"] = self.branches["PFLODC"]
         self.branches["COSFTMAX"] = float(1)
         self.branches["COSFTMIN"] = float(-1)
         self.branches["SINFTMAX"] = float(1)
