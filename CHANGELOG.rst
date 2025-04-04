@@ -1,6 +1,12 @@
 Changelog
 =========
 
+0.0.15 (2025-04-04)
+-------------------
+
+* Bus mapping for some pglib networks
+* Compute Bigm for AC OTS only if needed
+
 0.0.14 (2025-04-04)
 -------------------
 

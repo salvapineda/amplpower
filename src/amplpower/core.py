@@ -147,21 +147,24 @@ class PowerSystem:
         self.branches["GTT"] = np.real(self.ytt)
         self.branches["BTT"] = np.imag(self.ytt)
 
-        # Initialize Big-M values
-        self.branches["PFUPDC"] = 0
-        self.branches["PFLODC"] = 0
-        self.branches["PFUPAC"] = 0
-        self.branches["PFLOAC"] = 0
-        self.branches["PTUPAC"] = 0
-        self.branches["PTLOAC"] = 0
-        self.branches["QFUPAC"] = 0
-        self.branches["QFLOAC"] = 0
-        self.branches["QTUPAC"] = 0
-        self.branches["QTLOAC"] = 0
-        self.branches["COSFTMAX"] = 1
-        self.branches["COSFTMIN"] = -1
-        self.branches["SINFTMAX"] = 1
-        self.branches["SINFTMIN"] = -1
+        # Initialize Big-M values for DC power flow
+        self.branches["PFUPDC"] = (1 / self.branches["BR_X"]) * (self.cf @ self.buses["AMAX"] - self.ct @ self.buses["AMIN"])
+        self.branches["PFLODC"] = (1 / self.branches["BR_X"]) * (self.cf @ self.buses["AMIN"] - self.ct @ self.buses["AMAX"])
+
+        # Initialize Big-M values for AC power flow
+        max_rate_a = self.branches["RATE_A"].max()
+        self.branches["PFUPAC"] = max_rate_a
+        self.branches["PFLOAC"] = -max_rate_a
+        self.branches["PTUPAC"] = max_rate_a
+        self.branches["PTLOAC"] = -max_rate_a
+        self.branches["QFUPAC"] = max_rate_a
+        self.branches["QFLOAC"] = -max_rate_a
+        self.branches["QTUPAC"] = max_rate_a
+        self.branches["QTLOAC"] = -max_rate_a
+        self.branches["COSFTMAX"] = float(1)
+        self.branches["COSFTMIN"] = float(-1)
+        self.branches["SINFTMAX"] = float(1)
+        self.branches["SINFTMIN"] = float(-1)
 
         # Compute generator connection matrix
         for g in range(self.ngen):
@@ -210,16 +213,9 @@ class PowerSystem:
         print("\nGenerator Costs:")
         print(self.gencost.head())
 
-    def compute_initial_bigm_dc(self):
-        """Compute Big-M values for DC the different lines and return them in a DataFrame."""
-        print("=======Computing initial bigM values for DC power flow")
-        self.branches["PFUPDC"] = (1 / self.branches["BR_X"]) * (self.cf @ self.buses["AMAX"] - self.ct @ self.buses["AMIN"])
-        self.branches["PFLODC"] = (1 / self.branches["BR_X"]) * (self.cf @ self.buses["AMIN"] - self.ct @ self.buses["AMAX"])
-        # print(self.branches[["PFUPDC", "PFLODC"]])
-
     def compute_initial_bigm_ac(self):
         """Compute Big-M values for AC the different lines and return them in a DataFrame."""
-        print("=======Computing initial bigM values for AC power flow")
+        print("=======Computing bigM values for AC power flow")
         for lin_index in range(self.nlin):
             f_bus = int(self.branches.loc[lin_index, "F_BUS"])
             t_bus = int(self.branches.loc[lin_index, "T_BUS"])
@@ -325,14 +321,10 @@ class PowerSystem:
         elif switching == "bigm":
             self.branches["BR_STATUS"] = 3
 
-        # Handle Big-M computations based on switching and opf_type
-        if switching == "bigm":
-            if opf_type == "dc" and (self.branches[["PFUPDC", "PFLODC"]] == 0).all().all():
-                print("=======Computing Big-M values for DC power flow")
-                self.compute_initial_bigm_dc()
-            elif opf_type != "dc" and (self.branches[["PFUPAC", "PFLOAC"]] == 0).all().all():
-                print("=======Computing Big-M values for AC power flow")
-                self.compute_initial_bigm_ac()
+        # Compute Big-M for AC power flow using optimization
+        if switching == "bigm" and opf_type != "dc" and (self.branches["COSFTMAX"] == 1).all():
+            print("=======Computing Big-M values for AC power flow")
+            self.compute_initial_bigm_ac()
 
         print(
             f"=======Solving OPF ({opf_type}) with switching {switching} and connectivity {connectivity} with solver {solver} and options {options}"
