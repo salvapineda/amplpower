@@ -1,6 +1,11 @@
 Changelog
 =========
 
+0.0.17 (2025-04-04)
+-------------------
+
+* Bug relatex to BR_X negative in some networks.
+
 0.0.16 (2025-04-04)
 -------------------
 

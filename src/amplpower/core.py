@@ -148,8 +148,8 @@ class PowerSystem:
         self.branches["BTT"] = np.imag(self.ytt)
 
         # Initialize Big-M values for DC power flow
-        self.branches["PFUPDC"] = (1 / self.branches["BR_X"]) * (self.cf @ self.buses["AMAX"] - self.ct @ self.buses["AMIN"])
-        self.branches["PFLODC"] = (1 / self.branches["BR_X"]) * (self.cf @ self.buses["AMIN"] - self.ct @ self.buses["AMAX"])
+        self.branches["PFUPDC"] = (1 / np.abs(self.branches["BR_X"])) * (self.cf @ self.buses["AMAX"] - self.ct @ self.buses["AMIN"])
+        self.branches["PFLODC"] = (1 / np.abs(self.branches["BR_X"])) * (self.cf @ self.buses["AMIN"] - self.ct @ self.buses["AMAX"])
 
         # Initialize Big-M values for AC power flow
         self.branches["PFUPAC"] = self.branches["PFUPDC"]
