@@ -44,14 +44,21 @@ class PowerSystem:
             self.baseMVA = case.baseMVA
             self.buses = case.bus
             self.buses.reset_index(drop=True, inplace=True)
-            self.buses["BUS_I"] -= 1
+
+            # Create a mapping for bus numbers
+            self.bus_mapping = {bus: idx for idx, bus in enumerate(self.buses["BUS_I"])}
+            self.reverse_bus_mapping = {idx: bus for bus, idx in self.bus_mapping.items()}
+            self.buses["BUS_I"] = self.buses["BUS_I"].map(self.bus_mapping)
+
             self.generators = case.gen
             self.generators.reset_index(drop=True, inplace=True)
-            self.generators["GEN_BUS"] -= 1
+            self.generators["GEN_BUS"] = self.generators["GEN_BUS"].map(self.bus_mapping)
+
             self.branches = case.branch
             self.branches.reset_index(drop=True, inplace=True)
-            self.branches["F_BUS"] -= 1
-            self.branches["T_BUS"] -= 1
+            self.branches["F_BUS"] = self.branches["F_BUS"].map(self.bus_mapping)
+            self.branches["T_BUS"] = self.branches["T_BUS"].map(self.bus_mapping)
+
             self.gencost = case.gencost
             self.gencost.reset_index(drop=True, inplace=True)
             self.nbus = len(self.buses)
@@ -451,6 +458,9 @@ class PowerSystem:
                 },
                 index=ampl.get_variable("Vm").get_values().to_pandas().index,
             )
+
+            # Reverse map bus indices to original numbers
+            bus_df.index = bus_df.index.map(self.reverse_bus_mapping)
 
             return {
                 "obj": ampl.get_objective("total_cost").value(),
