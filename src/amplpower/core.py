@@ -338,8 +338,6 @@ class PowerSystem:
         ampl.param["MINVOL"] = self.min_voltage
 
         ampl.option["mp_options"] = options
-        option_command = f"option {solver}_options '{options}';"
-        ampl.eval(option_command)
         ampl.solve(solver=solver)
         solver_status = ampl.solve_result
 
