@@ -458,7 +458,7 @@ class PowerSystem:
                 "gen": gen_df,
                 "bus": bus_df,
                 "lin": line_df,
-                "status": "solved",
+                "status": solver_status,
             }
 
         except Exception:
