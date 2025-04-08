@@ -24,16 +24,17 @@ def array2dict(array):
 class PowerSystem:
     """PowerSystem class for solving optimal power flow problems."""
 
-    def __init__(self, case_file: str):
+    def __init__(self, case_file: str, max_voltage_angle: float = np.pi / 2, min_voltage_angle: float = -np.pi / 2):
         """Initialize the power system with a MATPOWER case file."""
         print(f"=======Initializing the power system with case file: {case_file}")
         self.case_file = case_file
-        self.max_angle = np.pi / 2
-        self.min_angle = -np.pi / 2
+        self.max_angle = max_voltage_angle
+        self.min_angle = min_voltage_angle
         self.load_data()
         self.summary()
         self.compute_matrices()
         self.initialize()
+        self.compute_voltage_bounds()
         self.compute_bigm_dc()
         self.compute_bigm_ac()
 
@@ -70,12 +71,13 @@ class PowerSystem:
             if "COST_2" not in self.gencost.columns:
                 self.gencost["COST_2"] = 0
 
-            # Minimum and maximum voltage limits
-            self.max_voltage = self.buses["VMAX"].max()
-            self.min_voltage = self.buses["VMIN"].min()
-            # TODO remove max_voltage and min_voltage??
+            # Minimum and maximum limits for voltage angle and real/imaginary voltage variables
             self.buses["AMAX"] = self.max_angle
             self.buses["AMIN"] = self.min_angle
+            self.buses["VRMAX"] = self.buses["VMAX"]
+            self.buses["VRMIN"] = 0
+            self.buses["VIMAX"] = self.buses["VMAX"]
+            self.buses["VIMIN"] = -self.buses["VMAX"]
 
             # Convert to per unit
             self.buses["PD"] /= self.baseMVA
@@ -198,6 +200,34 @@ class PowerSystem:
         print("\nGenerator Costs:")
         print(self.gencost.head())
 
+    def compute_voltage_bounds(self):
+        """Compute bounds for the real and imaginary parts of voltage."""
+        print("=======Computing voltage bounds")
+        for bus in range(self.nbus):
+            vmin = self.buses.loc[bus, "VMIN"]
+            vmax = self.buses.loc[bus, "VMAX"]
+            amin = self.buses.loc[bus, "AMIN"]
+            amax = self.buses.loc[bus, "AMAX"]
+            v_critical = [vmin, vmax]
+            a_critical = [amin, amax]
+            for ac in [0, np.pi / 2, np.pi, -np.pi / 2, -1 * np.pi]:
+                if amin <= ac <= amax:
+                    a_critical.append(ac)
+            vrmin = float("inf")
+            vrmax = float("-inf")
+            vimin = float("inf")
+            vimax = float("-inf")
+            for v in v_critical:
+                for a in a_critical:
+                    vrmin = min(vrmin, v * np.cos(a))
+                    vrmax = max(vrmax, v * np.cos(a))
+                    vimin = min(vimin, v * np.sin(a))
+                    vimax = max(vimax, v * np.sin(a))
+            self.buses.loc[bus, "VRMIN"] = vrmin
+            self.buses.loc[bus, "VRMAX"] = vrmax
+            self.buses.loc[bus, "VIMIN"] = vimin
+            self.buses.loc[bus, "VIMAX"] = vimax
+
     def compute_bigm_dc(self):
         """Compute Big-M values for DC power flow."""
         print("=======Computing Big-M values for DC power flow")
@@ -305,8 +335,6 @@ class PowerSystem:
         ampl.param["OPF_TYPE"] = opf_type
         ampl.param["CONNECTIVITY"] = connectivity
         ampl.param["BASEMVA"] = self.baseMVA
-        ampl.param["MAXVOL"] = self.max_voltage
-        ampl.param["MINVOL"] = self.min_voltage
 
         ampl.option["mp_options"] = options
         ampl.solve(solver=solver)

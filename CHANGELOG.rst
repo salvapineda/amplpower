@@ -1,6 +1,12 @@
 Changelog
 =========
 
+0.0.18 (2025-04-08)
+-------------------
+
+* BigM for AC OTS are computed exploring all critical points
+* Compute bounds for real and imaginary parts of voltage
+
 0.0.17 (2025-04-04)
 -------------------
 
