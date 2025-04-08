@@ -20,40 +20,29 @@ def find_min_max(a, b, c, xmin, xmax, ymin, ymax, zmin, zmax):
     def f(x, y, z):
         return a * x**2 + b * x * y * np.cos(z) + c * x * y * np.sin(z)
 
-    # Generate all boundary combinations
-    boundaries = [(x, y, z) for x in (xmin, xmax) for y in (ymin, ymax) for z in (zmin, zmax)]
-
-    # Add special z candidates (from KKT conditions)
-    special_z = []
-    if c != 0:
-        z1 = np.arctan2(-b, c)  # From ∂f/∂y = 0
-        if zmin <= z1 <= zmax:
-            special_z.append(z1)
-    if b != 0:
-        z2 = np.arctan2(c, b)  # From ∂f/∂z = 0
-        if zmin <= z2 <= zmax:
-            special_z.append(z2)
-
-    # Add points with special z values
-    for z in special_z:
-        for x in (xmin, xmax):
-            for y in (ymin, ymax):
-                boundaries.append((x, y, z))
-        # Check interior x if a < 0
-        if a < 0:
-            for y in (ymin, ymax):
-                x = -(b * y * np.cos(z) + c * y * np.sin(z)) / (2 * a)
-                if xmin < x < xmax:
-                    boundaries.append((x, y, z))
+    # Make a list of candidates
+    candidates = []
+    y_critical = [ymin, ymax]
+    z_critical = [zmin, zmax]
+    for zc in [-np.pi, -np.pi / 2, 0, np.pi / 2, np.pi, np.arctan2(c, b), np.arctan2(-c, -b), np.arctan2(-b, c), np.arctan2(b, -c)]:
+        if zmin <= zc <= zmax:
+            z_critical += [zc]
+    for y in y_critical:
+        for z in z_critical:
+            x_critical = [xmin, xmax]
+            if a != 0:
+                for xc in [-(b * y * np.cos(z) + c * y * np.sin(z)) / (2 * a), (b * y * np.cos(z) + c * y * np.sin(z)) / (2 * a)]:
+                    if xmin < xc < xmax:
+                        x_critical += [xc]
+            for x in x_critical:
+                candidates.append((x, y, z))
 
     # Evaluate all candidates
     min_val, max_val = float("inf"), float("-inf")
-
-    for point in boundaries:
+    for point in candidates:
         val = f(*point)
         if val < min_val:
             min_val = val
         if val > max_val:
             max_val = val
-
     return min_val, max_val

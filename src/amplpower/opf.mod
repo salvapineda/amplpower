@@ -116,6 +116,7 @@ var Qt {l in L} >= -RATE_A[l], <=RATE_A[l] := QT0[l];
 var Vm {n in N} >= VMIN[n], <= VMAX[n] := VOL0[n];
 var Vr {n in N} >= 0, <=VMAX[n] := VOLR0[n];
 var Vi {n in N} >= -VMAX[n], <=VMAX[n] := VOLI0[n];
+# TODO: Different bounds for real and imaginary parts of voltage
 var V2 {n in N} >= VMIN[n]^2, <= VMAX[n]^2 := VOL0[n]^2;
 var Va {n in N} >= AMIN[n], <= AMAX[n] := ANG0[n];
 var cosft {l in L} >= COSFTMIN[l], <= COSFTMAX[l] := VOL0[F_BUS[l]]*VOL0[T_BUS[l]]*cos(ANG0[F_BUS[l]]-ANG0[T_BUS[l]]);

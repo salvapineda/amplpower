@@ -66,7 +66,6 @@ setup(
         "matpowercaseframes==1.1.2",
         "numpy>=1.26.4",
         "pandas>=2.2.3",
-        "scipy>=1.7.3",
     ],
     extras_require={
         # eg:

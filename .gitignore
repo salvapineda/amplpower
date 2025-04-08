@@ -27,6 +27,7 @@ dist
 eggs
 lib
 lib64
+local_test
 parts
 pip-wheel-metadata/
 pyvenv*/
