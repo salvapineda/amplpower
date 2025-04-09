@@ -74,10 +74,6 @@ class PowerSystem:
             # Minimum and maximum limits for voltage angle and real/imaginary voltage variables
             self.buses["AMAX"] = self.max_angle
             self.buses["AMIN"] = self.min_angle
-            self.buses["VRMAX"] = self.buses["VMAX"]
-            self.buses["VRMIN"] = 0
-            self.buses["VIMAX"] = self.buses["VMAX"]
-            self.buses["VIMIN"] = -self.buses["VMAX"]
 
             # Convert to per unit
             self.buses["PD"] /= self.baseMVA
@@ -231,8 +227,6 @@ class PowerSystem:
     def compute_bigm_dc(self):
         """Compute Big-M values for DC power flow."""
         print("=======Computing Big-M values for DC power flow")
-        self.branches["PFUPDC"] = (1 / np.abs(self.branches["BR_X"])) * (self.cf @ self.buses["AMAX"] - self.ct @ self.buses["AMIN"])
-        self.branches["PFLODC"] = (1 / np.abs(self.branches["BR_X"])) * (self.cf @ self.buses["AMIN"] - self.ct @ self.buses["AMAX"])
         for lin_index in range(self.nlin):
             branch = self.branches.iloc[lin_index]
             br_x = branch["BR_X"]
@@ -450,9 +444,6 @@ class PowerSystem:
                 },
                 index=ampl.get_variable("Vm").get_values().to_pandas().index,
             )
-
-            # Reverse map bus indices to original numbers
-            bus_df.index = bus_df.index.map(self.reverse_bus_mapping)
 
             return {
                 "obj": ampl.get_objective("total_cost").value(),
