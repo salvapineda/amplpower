@@ -1,6 +1,11 @@
 Changelog
 =========
 
+0.0.20 (2025-04-11)
+-------------------
+
+* Add maximum violation of AC constraints to results.
+
 0.0.19 (2025-04-09)
 -------------------
 

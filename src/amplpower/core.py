@@ -445,6 +445,18 @@ class PowerSystem:
                 index=ampl.get_variable("Vm").get_values().to_pandas().index,
             )
 
+            # Compute maximum violation for all variables
+            max_viol = max(
+                np.max(np.abs(Pg_viol)),
+                np.max(np.abs(Qg_viol)),
+                np.max(np.abs(P_viol)),
+                np.max(np.abs(Q_viol)),
+                np.max(np.abs(Sf_viol)),
+                np.max(np.abs(St_viol)),
+                np.max(np.abs(Vm_viol)),
+                np.max(np.abs(Va_viol)),
+            )
+
             return {
                 "obj": ampl.get_objective("total_cost").value(),
                 "time": ampl.get_value("_solve_time"),
@@ -452,8 +464,9 @@ class PowerSystem:
                 "bus": bus_df,
                 "lin": line_df,
                 "status": solver_status,
+                "max_viol": max_viol,
             }
 
         except Exception:
             print("=======Error: No solution found:")
-            return {"obj": None, "time": None, "gen": None, "bus": None, "lin": None, "status": solver_status}
+            return {"obj": None, "time": None, "gen": None, "bus": None, "lin": None, "status": solver_status, "max_viol": None}
