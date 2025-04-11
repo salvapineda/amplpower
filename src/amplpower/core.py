@@ -330,7 +330,7 @@ class PowerSystem:
         ampl.param["CONNECTIVITY"] = connectivity
         ampl.param["BASEMVA"] = self.baseMVA
 
-        ampl.option["mp_options"] = options
+        ampl.option[solver + "_options"] = options
         ampl.solve(solver=solver)
         solver_status = ampl.solve_result
 
@@ -446,15 +446,17 @@ class PowerSystem:
             )
 
             # Compute maximum violation for all variables
-            max_viol = max(
-                np.max(np.abs(Pg_viol)),
-                np.max(np.abs(Qg_viol)),
-                np.max(np.abs(P_viol)),
-                np.max(np.abs(Q_viol)),
-                np.max(np.abs(Sf_viol)),
-                np.max(np.abs(St_viol)),
-                np.max(np.abs(Vm_viol)),
-                np.max(np.abs(Va_viol)),
+            max_viol = float(
+                max(
+                    np.max(np.abs(Pg_viol)),
+                    np.max(np.abs(Qg_viol)),
+                    np.max(np.abs(P_viol)),
+                    np.max(np.abs(Q_viol)),
+                    np.max(np.abs(Sf_viol)),
+                    np.max(np.abs(St_viol)),
+                    np.max(np.abs(Vm_viol)),
+                    np.max(np.abs(Va_viol)),
+                )
             )
 
             return {
