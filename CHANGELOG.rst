@@ -1,14 +1,15 @@
 Changelog
 =========
 
+0.0.23 (2025-05-24)
+-------------------
+
+* Fix initialize generation leven when multiple units at the same bus
+
 0.0.22 (2025-04-24)
 -------------------
 
 * Fix division by zero in generator violation calculation
-
-0.0.21 (2025-04-11)
--------------------
-
 * Chage options input to the solver
 
 0.0.20 (2025-04-11)

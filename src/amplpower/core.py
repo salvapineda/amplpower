@@ -178,8 +178,17 @@ class PowerSystem:
         sd = self.buses["PD"].values + 1j * self.buses["QD"].values
         sb = v * np.conj(self.yb @ v)
         sg = sb + sd
-        self.generators["PG0"] = np.dot(np.real(sg), self.cg.T)
-        self.generators["QG0"] = np.dot(np.imag(sg), self.cg.T)
+        pg_split = np.zeros(self.ngen)
+        qg_split = np.zeros(self.ngen)
+        for bus in range(self.nbus):
+            gen_indices = self.generators[self.generators["GEN_BUS"] == bus].index
+            if len(gen_indices) > 0:
+                pmax_total = self.generators.loc[gen_indices, "PMAX"].sum()
+                if pmax_total > 0:
+                    pg_split[gen_indices] = np.real(sg[bus]) * self.generators.loc[gen_indices, "PMAX"] / pmax_total
+                    qg_split[gen_indices] = np.imag(sg[bus]) * self.generators.loc[gen_indices, "PMAX"] / pmax_total
+        self.generators["PG0"] = pg_split
+        self.generators["QG0"] = qg_split
 
     def summary(self):
         """Print summary of the network."""
@@ -440,6 +449,7 @@ class PowerSystem:
             S_viol = Sg @ self.cg - Sd - Ssh - Sf @ self.cf - St @ self.ct
             P_viol = 100 * np.real(S_viol) / sum(self.buses["PD"].values)
             Q_viol = 100 * np.imag(S_viol) / sum(self.buses["QD"].values)
+            # TODO: Check these violations terms, not sure this is the best way to compute them. Why not as p.u.?
             bus_df = pd.DataFrame(
                 {
                     "Vm": Vm,
