@@ -1,6 +1,11 @@
 Changelog
 =========
 
+0.0.22 (2025-04-24)
+-------------------
+
+* Fix division by zero in generator violation calculation
+
 0.0.21 (2025-04-11)
 -------------------
 

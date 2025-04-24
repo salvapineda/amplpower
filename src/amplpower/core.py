@@ -338,16 +338,23 @@ class PowerSystem:
             # Get the generation results
             Pg = ampl.get_variable("Pg").get_values().to_pandas().values.flatten()
             Qg = ampl.get_variable("Qg").get_values().to_pandas().values.flatten()
-            Pg_viol = (
-                100
-                * np.maximum(0, Pg - self.generators["PMAX"].values, self.generators["PMIN"].values - Pg)
-                / (self.generators["PMAX"].values - self.generators["PMIN"].values)
+
+            # Avoid division by zero for Pg_viol
+            pmax_pmin_diff = self.generators["PMAX"].values - self.generators["PMIN"].values
+            Pg_viol = np.where(
+                pmax_pmin_diff == 0,
+                0,
+                100 * np.maximum(0, Pg - self.generators["PMAX"].values, self.generators["PMIN"].values - Pg) / pmax_pmin_diff,
             )
-            Qg_viol = (
-                100
-                * np.maximum(0, Qg - self.generators["QMAX"].values, self.generators["QMIN"].values - Qg)
-                / (self.generators["QMAX"].values - self.generators["QMIN"].values)
+
+            # Avoid division by zero for Qg_viol
+            qmax_qmin_diff = self.generators["QMAX"].values - self.generators["QMIN"].values
+            Qg_viol = np.where(
+                qmax_qmin_diff == 0,
+                0,
+                100 * np.maximum(0, Qg - self.generators["QMAX"].values, self.generators["QMIN"].values - Qg) / qmax_qmin_diff,
             )
+
             gen_df = pd.DataFrame(
                 {"Pg": Pg, "Qg": Qg, "Pg_viol": Pg_viol, "Qg_viol": Qg_viol},
                 index=ampl.get_variable("Pg").get_values().to_pandas().index,
