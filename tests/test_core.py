@@ -19,7 +19,7 @@ def test_compute():
 )
 def test_opf(opf_type, solver):
     ps = PowerSystem("./src/amplpower/data/case9.m")
-    results = ps.solve_opf(opf_type=opf_type, switching="off", connectivity="off", solver=solver, options="outlev=1 timelimit=5")
+    results = ps.solve_opf(opf_type=opf_type, switching="off", connectivity="off", solver=solver)
     print(f"Objective function value: {results['obj']}")
     print(f"Time: {results['time']}")
     print(results["gen"])

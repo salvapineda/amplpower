@@ -1,7 +1,12 @@
 Changelog
 =========
 
-0.0.23 (2025-05-24)
+0.0.24 (2025-05-05)
+-------------------
+
+* No default options for solver
+
+0.0.23 (2025-04-24)
 -------------------
 
 * Fix initialize generation leven when multiple units at the same bus

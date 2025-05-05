@@ -300,7 +300,7 @@ class PowerSystem:
             self.branches.loc[lin_index, "SINFTMAX"] = sin_max
             self.branches.loc[lin_index, "SINFTMIN"] = sin_min
 
-    def solve_opf(self, opf_type="dc", switching="off", connectivity="off", solver="gurobi", options="outlev=1 timelimit=3600"):
+    def solve_opf(self, opf_type="dc", switching="off", connectivity="off", solver="gurobi", options=""):
         """Solve the optimal power flow problem using AMPL.
         Parameters:
         opf_type (str): Type of optimal power flow ('dc', 'acrect', 'acjabr')
