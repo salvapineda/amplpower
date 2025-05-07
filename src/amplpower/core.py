@@ -307,9 +307,9 @@ class PowerSystem:
         max_marginal_cost = 0
         for g in range(self.ngen):
             max_marginal_cost = max(
-                max_marginal_cost, self.generators.loc[g, "COST_2"] * self.generators.loc[g, "PMAX"] + self.generators.loc[g, "COST_1"]
+                max_marginal_cost, self.gencost.loc[g, "COST_2"] * self.generators.loc[g, "PMAX"] + self.gencost.loc[g, "COST_1"]
             )
-        self.ubcost = max_marginal_cost * self.buses["PD"].sum() + self.generators["COST_0"].sum()
+        self.ubcost = max_marginal_cost * self.buses["PD"].sum() + self.gencost["COST_0"].sum()
 
     def create_model(self, opf_type="dc", switching="off", connectivity="off"):
         """Compute the feasible region for the power system.
@@ -525,17 +525,20 @@ class PowerSystem:
         self.solve_model(solver, options)
         return self.get_results_opf(opf_type)
 
-    def solve_obbt(self, obj="minimize_Pfa_1", solver="gurobi", options=""):
+    def solve_obbt(self, obj="minimize_Pfa_1", opf_type="dc", switching="bigm", connectivity="off", solver="gurobi", options=""):
         """Solve the optimal power flow problem using OBBT.
         Parameters:
         obj (str): Objective function to be optimized ('max_pf_1', 'min_pf_1', 'max_pf_2', 'min_pf_2')
+        opf_type (str): Type of optimal power flow ('dc', 'acrect', 'acjabr')
+        switching (str): Switching strategy ('off', 'nl', 'bigm')
+        connectivity (str): Connectivity for topology solutions ('off', 'on')
         solver (str): Solver to use ('gurobi', 'cplex', 'cbc')
         options (str): Options for the solver
         Returns:
         Maximum or minimum value of the objective function
         """
         direction, variable, line_index = obj.split("_")
-        self.create_model(opf_type="dc", switching="bigm", connectivity="off")
+        self.create_model(opf_type, switching, connectivity)
         self.model.eval(f"fix status[{line_index}]:=0;")
         self.model.eval(f"{direction} newbound: {variable}[{line_index}];")
         self.model.eval("option relax_integrality 1;")
