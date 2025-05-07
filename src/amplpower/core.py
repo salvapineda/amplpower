@@ -300,18 +300,14 @@ class PowerSystem:
             self.branches.loc[lin_index, "SINFTMAX"] = sin_max
             self.branches.loc[lin_index, "SINFTMIN"] = sin_min
 
-    def solve_opf(self, opf_type="dc", switching="off", connectivity="off", solver="gurobi", options=""):
-        """Solve the optimal power flow problem using AMPL.
+    def create_model(self, opf_type="dc", switching="off", connectivity="off"):
+        """Compute the feasible region for the power system.
         Parameters:
         opf_type (str): Type of optimal power flow ('dc', 'acrect', 'acjabr')
         switching (str): Switching strategy ('off', 'nl', 'bigm')
         connectivity (str): Connectivity for topology solutions ('off', 'on')
-        solver (str): Solver to use ('gurobi', 'cplex', 'cbc')
-        options (str): Options for the solver
-        Returns:
-        dict: Results of the optimal power flow problem
         """
-        # set the status of the lines
+        # Set the status of the lines
         if isinstance(switching, np.ndarray):
             self.branches["BR_STATUS"] = switching
         elif switching == "off":
@@ -321,32 +317,43 @@ class PowerSystem:
         elif switching == "bigm":
             self.branches["BR_STATUS"] = 3
 
-        print(
-            f"=======Solving OPF ({opf_type}) with switching {switching} and connectivity {connectivity} with solver {solver} and options {options}"
-        )
-        ampl = AMPL()
-        ampl.reset()
-        ampl.read(Path(__file__).parent / "opf.mod")
+        print(f"=======Computing feasible region ({opf_type}) with switching {switching} and connectivity {connectivity}")
+        self.model = AMPL()
+        self.model.reset()
+        self.model.read(Path(__file__).parent / "opf.mod")
+        self.model.set_data(self.buses, "N")
+        self.model.set_data(self.generators, "G")
+        self.model.set_data(self.branches, "L")
+        self.model.set_data(self.gencost)
+        self.model.param["CF"] = array2dict(self.cf)
+        self.model.param["CT"] = array2dict(self.ct)
+        self.model.param["CG"] = array2dict(self.cg)
+        self.model.param["OPF_TYPE"] = opf_type
+        self.model.param["CONNECTIVITY"] = connectivity
+        self.model.param["BASEMVA"] = self.baseMVA
 
-        ampl.set_data(self.buses, "N")
-        ampl.set_data(self.generators, "G")
-        ampl.set_data(self.branches, "L")
-        ampl.set_data(self.gencost)
-        ampl.param["CF"] = array2dict(self.cf)
-        ampl.param["CT"] = array2dict(self.ct)
-        ampl.param["CG"] = array2dict(self.cg)
-        ampl.param["OPF_TYPE"] = opf_type
-        ampl.param["CONNECTIVITY"] = connectivity
-        ampl.param["BASEMVA"] = self.baseMVA
+    def solve_model(self, solver="gurobi", options=""):
+        """Solve the model using the specified solver.
+        Parameters:
+        solver (str): Solver to use ('gurobi', 'cplex', 'cbc')
+        options (str): Options for the solver
+        Returns:
+        dict: Results of the optimization
+        """
+        print(f"=======Solving model with solver {solver} and options {options}")
+        self.model.option[solver + "_options"] = options
+        self.model.solve(solver=solver)
 
-        ampl.option[solver + "_options"] = options
-        ampl.solve(solver=solver)
-        solver_status = ampl.solve_result
-
+    def get_results_opf(self, opf_type="dc"):
+        """Get results from the solved model.
+        Returns:
+        dict: Results of the optimization
+        """
+        solver_status = self.model.solve_result
         try:
             # Get the generation results
-            Pg = ampl.get_variable("Pg").get_values().to_pandas().values.flatten()
-            Qg = ampl.get_variable("Qg").get_values().to_pandas().values.flatten()
+            Pg = self.model.get_variable("Pg").get_values().to_pandas().values.flatten()
+            Qg = self.model.get_variable("Qg").get_values().to_pandas().values.flatten()
 
             # Avoid division by zero for Pg_viol
             pmax_pmin_diff = self.generators["PMAX"].values - self.generators["PMIN"].values
@@ -366,15 +373,15 @@ class PowerSystem:
 
             gen_df = pd.DataFrame(
                 {"Pg": Pg, "Qg": Qg, "Pg_viol": Pg_viol, "Qg_viol": Qg_viol},
-                index=ampl.get_variable("Pg").get_values().to_pandas().index,
+                index=self.model.get_variable("Pg").get_values().to_pandas().index,
             )
 
             # Get the line results
-            switching = ampl.get_variable("status").get_values().to_pandas().values.flatten()
-            Pf = ampl.get_variable("Pf").get_values().to_pandas().values.flatten()
-            Pt = ampl.get_variable("Pt").get_values().to_pandas().values.flatten()
-            Qf = ampl.get_variable("Qf").get_values().to_pandas().values.flatten()
-            Qt = ampl.get_variable("Qt").get_values().to_pandas().values.flatten()
+            switching = self.model.get_variable("status").get_values().to_pandas().values.flatten()
+            Pf = self.model.get_variable("Pf").get_values().to_pandas().values.flatten()
+            Pt = self.model.get_variable("Pt").get_values().to_pandas().values.flatten()
+            Qf = self.model.get_variable("Qf").get_values().to_pandas().values.flatten()
+            Qt = self.model.get_variable("Qt").get_values().to_pandas().values.flatten()
             Sf = Pf + 1j * Qf
             St = Pt + 1j * Qt
             Sf_viol = (
@@ -399,19 +406,19 @@ class PowerSystem:
                     "Sf_viol": Sf_viol,
                     "St_viol": St_viol,
                 },
-                index=ampl.get_variable("status").get_values().to_pandas().index,
+                index=self.model.get_variable("status").get_values().to_pandas().index,
             )
 
             # Get the voltage results
             if opf_type == "acrect":
-                volr = ampl.get_variable("Vr").get_values().to_pandas().values.flatten()
-                voli = ampl.get_variable("Vi").get_values().to_pandas().values.flatten()
+                volr = self.model.get_variable("Vr").get_values().to_pandas().values.flatten()
+                voli = self.model.get_variable("Vi").get_values().to_pandas().values.flatten()
                 Vm = np.sqrt(volr**2 + voli**2)
                 Va = np.arctan2(voli, volr)
             elif opf_type == "acjabr":
-                vol2 = ampl.get_variable("V2").get_values().to_pandas().values.flatten()
+                vol2 = self.model.get_variable("V2").get_values().to_pandas().values.flatten()
                 Vm = np.sqrt(vol2)
-                vfvtcosft = ampl.get_variable("cosft").get_values().to_pandas().values.flatten()
+                vfvtcosft = self.model.get_variable("cosft").get_values().to_pandas().values.flatten()
                 vfvt = np.array([Vm[int(self.branches.loc[i, "F_BUS"])] * Vm[int(self.branches.loc[i, "T_BUS"])] for i in range(self.nlin)])
                 cosft = np.maximum(-1, np.minimum(1, vfvtcosft / vfvt))
                 # Compute angles for all buses
@@ -430,8 +437,8 @@ class PowerSystem:
                             Va[f_bus] = Va[t_bus] - np.arccos(cosft[line_index])
                             visited.add(f_bus)
             else:
-                Vm = ampl.get_variable("Vm").get_values().to_pandas().values.flatten()
-                Va = ampl.get_variable("Va").get_values().to_pandas().values.flatten()
+                Vm = self.model.get_variable("Vm").get_values().to_pandas().values.flatten()
+                Va = self.model.get_variable("Va").get_values().to_pandas().values.flatten()
             Vm_viol = (
                 100
                 * np.maximum(0, Vm - self.buses["VMAX"].values, self.buses["VMIN"].values - Vm)
@@ -459,7 +466,7 @@ class PowerSystem:
                     "P_viol": P_viol,
                     "Q_viol": Q_viol,
                 },
-                index=ampl.get_variable("Vm").get_values().to_pandas().index,
+                index=self.model.get_variable("Vm").get_values().to_pandas().index,
             )
 
             # Compute maximum violation for all variables
@@ -477,8 +484,8 @@ class PowerSystem:
             )
 
             return {
-                "obj": ampl.get_objective("total_cost").value(),
-                "time": ampl.get_value("_solve_time"),
+                "obj": self.model.get_objective("total_cost").value(),
+                "time": self.model.get_value("_solve_time"),
                 "gen": gen_df,
                 "bus": bus_df,
                 "lin": line_df,
@@ -489,3 +496,18 @@ class PowerSystem:
         except Exception:
             print("=======Error: No solution found:")
             return {"obj": None, "time": None, "gen": None, "bus": None, "lin": None, "status": solver_status, "max_viol": None}
+
+    def solve_opf(self, opf_type="dc", switching="off", connectivity="off", solver="gurobi", options=""):
+        """Solve the optimal power flow problem using AMPL.
+        Parameters:
+        opf_type (str): Type of optimal power flow ('dc', 'acrect', 'acjabr')
+        switching (str): Switching strategy ('off', 'nl', 'bigm')
+        connectivity (str): Connectivity for topology solutions ('off', 'on')
+        solver (str): Solver to use ('gurobi', 'cplex', 'cbc')
+        options (str): Options for the solver
+        Returns:
+        dict: Results of the optimal power flow problem
+        """
+        self.create_model(opf_type, switching, connectivity)
+        self.solve_model(solver, options)
+        return self.get_results_opf(opf_type)
