@@ -37,6 +37,7 @@ class PowerSystem:
         self.compute_voltage_bounds()
         self.compute_bigm_dc()
         self.compute_bigm_ac()
+        self.compute_ub_cost()
 
     def load_data(self):
         """Load MATPOWER case data into DataFrames and convert to per unit."""
@@ -300,6 +301,16 @@ class PowerSystem:
             self.branches.loc[lin_index, "SINFTMAX"] = sin_max
             self.branches.loc[lin_index, "SINFTMIN"] = sin_min
 
+    def compute_ub_cost(self):
+        """Compute upper bound for the cost function."""
+        # compute the maximum marginal cost for each generator and take the maximum
+        max_marginal_cost = 0
+        for g in range(self.ngen):
+            max_marginal_cost = max(
+                max_marginal_cost, self.generators.loc[g, "COST_2"] * self.generators.loc[g, "PMAX"] + self.generators.loc[g, "COST_1"]
+            )
+        self.ubcost = max_marginal_cost * self.buses["PD"].sum() + self.generators["COST_0"].sum()
+
     def create_model(self, opf_type="dc", switching="off", connectivity="off"):
         """Compute the feasible region for the power system.
         Parameters:
@@ -331,6 +342,7 @@ class PowerSystem:
         self.model.param["OPF_TYPE"] = opf_type
         self.model.param["CONNECTIVITY"] = connectivity
         self.model.param["BASEMVA"] = self.baseMVA
+        self.model.param["UBCOST"] = self.ubcost
 
     def solve_model(self, solver="gurobi", options=""):
         """Solve the model using the specified solver.

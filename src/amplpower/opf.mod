@@ -9,6 +9,7 @@ set L;
 param OPF_TYPE symbolic;
 param CONNECTIVITY symbolic;
 param BASEMVA;
+param UBCOST;
 param MAXANGLE;
 param MINANGLE;
 param COST_2 {G};
@@ -109,7 +110,7 @@ param VIMIN {N};
 
 ########## VARIABLES ##########
 
-var total_cost;
+var total_cost <= UBCOST;
 var Pg {g in G} >= PMIN[g], <= PMAX[g]:= PG0[g];
 var Qg {g in G} >= QMIN[g], <= QMAX[g]:= QG0[g];
 var Pf {l in L} >= -RATE_A[l], <=RATE_A[l] := PF0[l];
