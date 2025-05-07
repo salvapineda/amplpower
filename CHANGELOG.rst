@@ -1,6 +1,12 @@
 Changelog
 =========
 
+0.0.25 (2025-05-07)
+-------------------
+
+* Split solve_opf function
+* Add OBBT function to maximize/minimize other variables
+
 0.0.24 (2025-05-05)
 -------------------
 

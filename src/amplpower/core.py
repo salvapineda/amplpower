@@ -484,7 +484,7 @@ class PowerSystem:
             )
 
             return {
-                "obj": self.model.get_objective("total_cost").value(),
+                "obj": self.model.get_objective("objective").value(),
                 "time": self.model.get_value("_solve_time"),
                 "gen": gen_df,
                 "bus": bus_df,
@@ -509,5 +509,23 @@ class PowerSystem:
         dict: Results of the optimal power flow problem
         """
         self.create_model(opf_type, switching, connectivity)
+        self.model.eval("minimize objective: total_cost;")
         self.solve_model(solver, options)
         return self.get_results_opf(opf_type)
+
+    def solve_obbt(self, obj="minimize_Pfa_1", solver="gurobi", options=""):
+        """Solve the optimal power flow problem using OBBT.
+        Parameters:
+        obj (str): Objective function to be optimized ('max_pf_1', 'min_pf_1', 'max_pf_2', 'min_pf_2')
+        solver (str): Solver to use ('gurobi', 'cplex', 'cbc')
+        options (str): Options for the solver
+        Returns:
+        Maximum or minimum value of the objective function
+        """
+        direction, variable, line_index = obj.split("_")
+        self.create_model(opf_type="dc", switching="bigm", connectivity="off")
+        self.model.eval(f"fix status[{line_index}]:=0;")
+        self.model.eval(f"{direction} newbound: {variable}[{line_index}];")
+        self.model.eval("option relax_integrality 1;")
+        self.solve_model(solver, options)
+        return self.model.get_objective("newbound").value()

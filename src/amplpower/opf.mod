@@ -109,6 +109,7 @@ param VIMIN {N};
 
 ########## VARIABLES ##########
 
+var total_cost;
 var Pg {g in G} >= PMIN[g], <= PMAX[g]:= PG0[g];
 var Qg {g in G} >= QMIN[g], <= QMAX[g]:= QG0[g];
 var Pf {l in L} >= -RATE_A[l], <=RATE_A[l] := PF0[l];
@@ -131,10 +132,10 @@ var status {l in L} binary;
 var statusf {l in L} binary;
 var statust {l in L} binary;
 
-########## OBJECTIVE FUNCTION ##########
+########## COST DEFINITION ##########
 
-minimize total_cost:
-    sum {g in G} (COST_2[g] * (BASEMVA*Pg[g])^2 + COST_1[g] * (BASEMVA*Pg[g]) + COST_0[g]);
+subject to cost_definition:
+    total_cost = sum {g in G} (COST_2[g] * (BASEMVA*Pg[g])^2 + COST_1[g] * (BASEMVA*Pg[g]) + COST_0[g]);
 
 ########## POWER BALANCE ##########
 
