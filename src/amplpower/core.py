@@ -1,7 +1,6 @@
 import logging
 from pathlib import Path
 
-import networkx as nx
 import numpy as np
 import pandas as pd
 from amplpy import AMPL
@@ -313,14 +312,6 @@ class PowerSystem:
             )
         self.ubcost = max_marginal_cost * self.buses["PD"].sum() * self.baseMVA + self.gencost["COST_0"].sum()
 
-    def create_graph(self):
-        """Create an undirected graph of the power system using networkx."""
-        self.graph = nx.Graph()
-        for _, branch in self.branches.iterrows():
-            f_bus = int(branch["F_BUS"])
-            t_bus = int(branch["T_BUS"])
-            self.graph.add_edge(f_bus, t_bus)
-
     def set_switching(self, switching):
         """Set the switching status of the branches."""
         if isinstance(switching, np.ndarray):
@@ -395,14 +386,20 @@ class PowerSystem:
         Returns:
         Maximum or minimum value of the objective function
         """
-        self.create_model(opf_type, connectivity)
         direction, variable, line_index = obj.split("_")
+        # closelines = self.close_lines(int(line_index), level=3)
+        self.create_model(opf_type, connectivity)
         self.model.eval(f"fix status[{line_index}]:=0;")
         self.model.eval(f"{direction} newbound: {variable}[{line_index}];")
-        # self.model.eval("option relax_integrality 1;")
+        # for l in range(self.nlin):
+        #    if l not in closelines:
+        #        self.model.eval(f"let status[{l}].relax :=1;")
+        self.model.eval("option relax_integrality 1;")
         self.solve_model(solver, options)
         solve_status = self.model.solve_result
-        if solve_status == "infeasible":
+        if solve_status == "solved":
+            return solve_status, self.model.get_objective("newbound").value()
+        elif solve_status == "infeasible":
             return solve_status, None
         else:
             return solve_status, self.model.get_value("newbound.bestbound")
@@ -567,3 +564,36 @@ class PowerSystem:
         except Exception:
             print("=======Error: No solution found:")
             return {"obj": None, "time": None, "gen": None, "bus": None, "lin": None, "status": solver_status, "max_viol": None}
+
+    def close_lines(self, edge_index, level=1):
+        """Find the indexes of edges close to the given edge up to a specified level.
+        Parameters:
+        edge_index (int): Index of the edge for which to find close edges.
+        level (int): Depth of adjacency to consider (1 for adjacent, 2 for adjacent of adjacent, etc.).
+        Returns:
+        list: Indexes of edges connected to the same f_bus or t_bus up to the specified level, excluding the given edge.
+        """
+        visited_edges = set()
+        current_edges = {edge_index}
+
+        for _ in range(level):
+            next_edges = set()
+            for edge in current_edges:
+                branch = self.branches.iloc[edge]
+                f_bus = int(branch["F_BUS"])
+                t_bus = int(branch["T_BUS"])
+                close_edges = self.branches[
+                    (
+                        (self.branches["F_BUS"] == f_bus)
+                        | (self.branches["T_BUS"] == f_bus)
+                        | (self.branches["F_BUS"] == t_bus)
+                        | (self.branches["T_BUS"] == t_bus)
+                    )
+                    & (~self.branches.index.isin(visited_edges))
+                ].index.tolist()
+                next_edges.update(close_edges)
+            visited_edges.update(current_edges)
+            current_edges = next_edges
+
+        visited_edges.discard(edge_index)
+        return list(visited_edges)
