@@ -124,10 +124,10 @@ var V2 {n in N} >= VMIN[n]^2, <= VMAX[n]^2 := VOL0[n]^2;
 var Va {n in N} >= AMIN[n], <= AMAX[n] := ANG0[n];
 var cosft {l in L} >= COSFTMIN[l], <= COSFTMAX[l] := VOL0[F_BUS[l]]*VOL0[T_BUS[l]]*cos(ANG0[F_BUS[l]]-ANG0[T_BUS[l]]);
 var sinft {l in L} >= SINFTMIN[l], <= SINFTMAX[l] := VOL0[F_BUS[l]]*VOL0[T_BUS[l]]*sin(ANG0[F_BUS[l]]-ANG0[T_BUS[l]]);
-var Pfa {l in L} >= min(PFLODC[l],PFLOAC[l]), <= max(PFUPDC[l],PFUPAC[l]) := PF0[l];
-var Pta {l in L} >= PTLOAC[l], <= PTUPAC[l] := PT0[l];
-var Qfa {l in L} >= QFLOAC[l], <= QFUPAC[l] := QF0[l];
-var Qta {l in L} >= QTLOAC[l], <= QTUPAC[l] := QT0[l];
+var Pfa {l in L} := PF0[l];
+var Pta {l in L} := PT0[l];
+var Qfa {l in L} := QF0[l];
+var Qta {l in L} := QT0[l];
 var u {n in N} >= 1, <= card(N);
 var status {l in L} binary;
 var statusf {l in L} binary;
@@ -248,10 +248,10 @@ subject to Pfa_upper_1 {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
     -Pf[l] + Pfa[l] <= PFUPDC[l] * (1 - status[l]);
 
 subject to Pta_lower_1 {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
-    PFLODC[l] * (1 - status[l]) <= -Pt[l] + Pta[l];
+    -PFUPDC[l] * (1 - status[l]) <= -Pt[l] + Pta[l];
 
 subject to Pta_upper_1 {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
-    -Pt[l] + Pta[l] <= PFUPDC[l] * (1 - status[l]);
+    -Pt[l] + Pta[l] <= -PFLODC[l] * (1 - status[l]);
 
 subject to active_flow_from_2_bigm {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
     Pfa[l] = GFF[l] * V2[F_BUS[l]] + GFT[l] * cosft[l] + BFT[l] * sinft[l];

@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+import networkx as nx
 import numpy as np
 import pandas as pd
 from amplpy import AMPL
@@ -307,18 +308,21 @@ class PowerSystem:
         max_marginal_cost = 0
         for g in range(self.ngen):
             max_marginal_cost = max(
-                max_marginal_cost, self.gencost.loc[g, "COST_2"] * self.generators.loc[g, "PMAX"] + self.gencost.loc[g, "COST_1"]
+                max_marginal_cost,
+                self.gencost.loc[g, "COST_2"] * self.generators.loc[g, "PMAX"] * self.baseMVA + self.gencost.loc[g, "COST_1"],
             )
-        self.ubcost = max_marginal_cost * self.buses["PD"].sum() + self.gencost["COST_0"].sum()
+        self.ubcost = max_marginal_cost * self.buses["PD"].sum() * self.baseMVA + self.gencost["COST_0"].sum()
 
-    def create_model(self, opf_type="dc", switching="off", connectivity="off"):
-        """Compute the feasible region for the power system.
-        Parameters:
-        opf_type (str): Type of optimal power flow ('dc', 'acrect', 'acjabr')
-        switching (str): Switching strategy ('off', 'nl', 'bigm')
-        connectivity (str): Connectivity for topology solutions ('off', 'on')
-        """
-        # Set the status of the lines
+    def create_graph(self):
+        """Create an undirected graph of the power system using networkx."""
+        self.graph = nx.Graph()
+        for _, branch in self.branches.iterrows():
+            f_bus = int(branch["F_BUS"])
+            t_bus = int(branch["T_BUS"])
+            self.graph.add_edge(f_bus, t_bus)
+
+    def set_switching(self, switching):
+        """Set the switching status of the branches."""
         if isinstance(switching, np.ndarray):
             self.branches["BR_STATUS"] = switching
         elif switching == "off":
@@ -328,7 +332,13 @@ class PowerSystem:
         elif switching == "bigm":
             self.branches["BR_STATUS"] = 3
 
-        print(f"=======Computing feasible region ({opf_type}) with switching {switching} and connectivity {connectivity}")
+    def create_model(self, opf_type="dc", connectivity="off"):
+        """Compute the feasible region for the power system.
+        Parameters:
+        opf_type (str): Type of optimal power flow ('dc', 'acrect', 'acjabr')
+        connectivity (str): Connectivity for topology solutions ('off', 'on')
+        """
+        print(f"=======Computing feasible region ({opf_type}) with connectivity {connectivity}")
         self.model = AMPL()
         self.model.reset()
         self.model.read(Path(__file__).parent / "opf.mod")
@@ -355,6 +365,47 @@ class PowerSystem:
         print(f"=======Solving model with solver {solver} and options {options}")
         self.model.option[solver + "_options"] = options
         self.model.solve(solver=solver)
+
+    def solve_opf(self, opf_type="dc", switching="off", connectivity="off", solver="gurobi", options=""):
+        """Solve the optimal power flow problem using AMPL.
+        Parameters:
+        opf_type (str): Type of optimal power flow ('dc', 'acrect', 'acjabr')
+        switching (str): Switching strategy ('off', 'nl', 'bigm')
+        connectivity (str): Connectivity for topology solutions ('off', 'on')
+        solver (str): Solver to use ('gurobi', 'cplex', 'cbc')
+        options (str): Options for the solver
+        Returns:
+        dict: Results of the optimal power flow problem
+        """
+        self.set_switching(switching)
+        self.create_model(opf_type, connectivity)
+        self.model.eval("minimize objective: total_cost;")
+        self.solve_model(solver, options)
+        return self.get_results_opf(opf_type)
+
+    def solve_obbt(self, obj="minimize_Pfa_1", opf_type="dc", connectivity="off", solver="gurobi", options=""):
+        """Solve the optimal power flow problem using OBBT.
+        Parameters:
+        obj (str): Objective function to be optimized ('max_pf_1', 'min_pf_1', 'max_pf_2', 'min_pf_2')
+        opf_type (str): Type of optimal power flow ('dc', 'acrect', 'acjabr')
+        switching (str): Switching strategy ('off', 'nl', 'bigm')
+        connectivity (str): Connectivity for topology solutions ('off', 'on')
+        solver (str): Solver to use ('gurobi', 'cplex', 'cbc')
+        options (str): Options for the solver
+        Returns:
+        Maximum or minimum value of the objective function
+        """
+        self.create_model(opf_type, connectivity)
+        direction, variable, line_index = obj.split("_")
+        self.model.eval(f"fix status[{line_index}]:=0;")
+        self.model.eval(f"{direction} newbound: {variable}[{line_index}];")
+        # self.model.eval("option relax_integrality 1;")
+        self.solve_model(solver, options)
+        solve_status = self.model.solve_result
+        if solve_status == "infeasible":
+            return solve_status, None
+        else:
+            return solve_status, self.model.get_value("newbound.bestbound")
 
     def get_results_opf(self, opf_type="dc"):
         """Get results from the solved model.
@@ -391,9 +442,13 @@ class PowerSystem:
             # Get the line results
             switching = self.model.get_variable("status").get_values().to_pandas().values.flatten()
             Pf = self.model.get_variable("Pf").get_values().to_pandas().values.flatten()
+            Pfa = self.model.get_variable("Pfa").get_values().to_pandas().values.flatten()
             Pt = self.model.get_variable("Pt").get_values().to_pandas().values.flatten()
+            Pta = self.model.get_variable("Pta").get_values().to_pandas().values.flatten()
             Qf = self.model.get_variable("Qf").get_values().to_pandas().values.flatten()
+            Qfa = self.model.get_variable("Qfa").get_values().to_pandas().values.flatten()
             Qt = self.model.get_variable("Qt").get_values().to_pandas().values.flatten()
+            Qta = self.model.get_variable("Qta").get_values().to_pandas().values.flatten()
             Sf = Pf + 1j * Qf
             St = Pt + 1j * Qt
             Sf_viol = (
@@ -417,6 +472,10 @@ class PowerSystem:
                     "St": abs(St),
                     "Sf_viol": Sf_viol,
                     "St_viol": St_viol,
+                    "Pfa": Pfa,
+                    "Pta": Pta,
+                    "Qfa": Qfa,
+                    "Qta": Qta,
                 },
                 index=self.model.get_variable("status").get_values().to_pandas().index,
             )
@@ -508,39 +567,3 @@ class PowerSystem:
         except Exception:
             print("=======Error: No solution found:")
             return {"obj": None, "time": None, "gen": None, "bus": None, "lin": None, "status": solver_status, "max_viol": None}
-
-    def solve_opf(self, opf_type="dc", switching="off", connectivity="off", solver="gurobi", options=""):
-        """Solve the optimal power flow problem using AMPL.
-        Parameters:
-        opf_type (str): Type of optimal power flow ('dc', 'acrect', 'acjabr')
-        switching (str): Switching strategy ('off', 'nl', 'bigm')
-        connectivity (str): Connectivity for topology solutions ('off', 'on')
-        solver (str): Solver to use ('gurobi', 'cplex', 'cbc')
-        options (str): Options for the solver
-        Returns:
-        dict: Results of the optimal power flow problem
-        """
-        self.create_model(opf_type, switching, connectivity)
-        self.model.eval("minimize objective: total_cost;")
-        self.solve_model(solver, options)
-        return self.get_results_opf(opf_type)
-
-    def solve_obbt(self, obj="minimize_Pfa_1", opf_type="dc", switching="bigm", connectivity="off", solver="gurobi", options=""):
-        """Solve the optimal power flow problem using OBBT.
-        Parameters:
-        obj (str): Objective function to be optimized ('max_pf_1', 'min_pf_1', 'max_pf_2', 'min_pf_2')
-        opf_type (str): Type of optimal power flow ('dc', 'acrect', 'acjabr')
-        switching (str): Switching strategy ('off', 'nl', 'bigm')
-        connectivity (str): Connectivity for topology solutions ('off', 'on')
-        solver (str): Solver to use ('gurobi', 'cplex', 'cbc')
-        options (str): Options for the solver
-        Returns:
-        Maximum or minimum value of the objective function
-        """
-        direction, variable, line_index = obj.split("_")
-        self.create_model(opf_type, switching, connectivity)
-        self.model.eval(f"fix status[{line_index}]:=0;")
-        self.model.eval(f"{direction} newbound: {variable}[{line_index}];")
-        self.model.eval("option relax_integrality 1;")
-        self.solve_model(solver, options)
-        return self.model.get_objective("newbound").value()
