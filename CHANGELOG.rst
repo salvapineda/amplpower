@@ -10,6 +10,7 @@ Changelog
 * Split creat model and solve model for clarity
 * Change result output
 * The AMPL model is now stored in self.ampl and can be modified by user
+* Add best bound to results if available
 
 0.0.24 (2025-05-05)
 -------------------

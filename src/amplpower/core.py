@@ -536,6 +536,10 @@ class PowerSystem:
 
             # Set other attributes
             results.obj = self.ampl.get_objective("objective").value()
+            try:
+                results.bestbound = self.ampl.get_value("objective.bestbound")
+            except AttributeError:
+                results.bestbound = None
             results.time = self.ampl.get_value("_solve_time")
             results.solver_status = solver_status
             results.max_viol = float(
@@ -555,6 +559,7 @@ class PowerSystem:
             print("=======Error: No solution found:")
             results = type("Results", (object,), {})()
             results.obj = None
+            results.bestbound = None
             results.time = None
             results.generators = None
             results.buses = None
