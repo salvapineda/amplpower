@@ -404,13 +404,49 @@ class PowerSystem:
         else:
             return solve_status, self.model.get_value("newbound.bestbound")
 
+    def close_lines(self, edge_index, level=1):
+        """Find the indexes of edges close to the given edge up to a specified level.
+        Parameters:
+        edge_index (int): Index of the edge for which to find close edges.
+        level (int): Depth of adjacency to consider (1 for adjacent, 2 for adjacent of adjacent, etc.).
+        Returns:
+        list: Indexes of edges connected to the same f_bus or t_bus up to the specified level, excluding the given edge.
+        """
+        visited_edges = set()
+        current_edges = {edge_index}
+
+        for _ in range(level):
+            next_edges = set()
+            for edge in current_edges:
+                branch = self.branches.iloc[edge]
+                f_bus = int(branch["F_BUS"])
+                t_bus = int(branch["T_BUS"])
+                close_edges = self.branches[
+                    (
+                        (self.branches["F_BUS"] == f_bus)
+                        | (self.branches["T_BUS"] == f_bus)
+                        | (self.branches["F_BUS"] == t_bus)
+                        | (self.branches["T_BUS"] == t_bus)
+                    )
+                    & (~self.branches.index.isin(visited_edges))
+                ].index.tolist()
+                next_edges.update(close_edges)
+            visited_edges.update(current_edges)
+            current_edges = next_edges
+
+        visited_edges.discard(edge_index)
+        return list(visited_edges)
+
     def get_results_opf(self, opf_type="dc"):
         """Get results from the solved model.
         Returns:
-        dict: Results of the optimization
+        object: Results of the optimization with attributes like obj, time, generators, buses, branches, etc.
         """
         solver_status = self.model.solve_result
         try:
+            # Create a simple object to hold results
+            results = type("Results", (object,), {})()
+
             # Get the generation results
             Pg = self.model.get_variable("Pg").get_values().to_pandas().values.flatten()
             Qg = self.model.get_variable("Qg").get_values().to_pandas().values.flatten()
@@ -431,7 +467,7 @@ class PowerSystem:
                 100 * np.maximum(0, Qg - self.generators["QMAX"].values, self.generators["QMIN"].values - Qg) / qmax_qmin_diff,
             )
 
-            gen_df = pd.DataFrame(
+            results.generators = pd.DataFrame(
                 {"Pg": Pg, "Qg": Qg, "Pg_viol": Pg_viol, "Qg_viol": Qg_viol},
                 index=self.model.get_variable("Pg").get_values().to_pandas().index,
             )
@@ -458,7 +494,7 @@ class PowerSystem:
                 * np.maximum(0, abs(St) - self.branches["RATE_A"].values, -self.branches["RATE_A"].values - abs(St))
                 / (2 * self.branches["RATE_A"].values)
             )
-            line_df = pd.DataFrame(
+            results.branches = pd.DataFrame(
                 {
                     "switching": switching,
                     "Pf": Pf,
@@ -517,83 +553,41 @@ class PowerSystem:
                 * np.maximum(0, Va - self.buses["AMAX"].values, self.buses["AMIN"].values - Va)
                 / (self.buses["AMAX"].values - self.buses["AMIN"].values)
             )
-            # Computation of power injections
-            Sd = self.buses["PD"].values + 1j * self.buses["QD"].values
-            Sg = Pg + 1j * Qg
-            Ssh = self.buses["GS"].values * Vm**2 - 1j * self.buses["BS"].values * Vm**2
-            S_viol = Sg @ self.cg - Sd - Ssh - Sf @ self.cf - St @ self.ct
-            P_viol = 100 * np.real(S_viol) / sum(self.buses["PD"].values)
-            Q_viol = 100 * np.imag(S_viol) / sum(self.buses["QD"].values)
-            # TODO: Check these violations terms, not sure this is the best way to compute them. Why not as p.u.?
-            bus_df = pd.DataFrame(
+            results.buses = pd.DataFrame(
                 {
                     "Vm": Vm,
                     "Va": Va,
                     "Vm_viol": Vm_viol,
                     "Va_viol": Va_viol,
-                    "P_viol": P_viol,
-                    "Q_viol": Q_viol,
                 },
                 index=self.model.get_variable("Vm").get_values().to_pandas().index,
             )
 
-            # Compute maximum violation for all variables
-            max_viol = float(
+            # Set other attributes
+            results.obj = self.model.get_objective("objective").value()
+            results.time = self.model.get_value("_solve_time")
+            results.status = solver_status
+            results.max_viol = float(
                 max(
                     np.max(np.abs(Pg_viol)),
                     np.max(np.abs(Qg_viol)),
-                    np.max(np.abs(P_viol)),
-                    np.max(np.abs(Q_viol)),
-                    np.max(np.abs(Sf_viol)),
-                    np.max(np.abs(St_viol)),
                     np.max(np.abs(Vm_viol)),
                     np.max(np.abs(Va_viol)),
+                    np.max(np.abs(Sf_viol)),
+                    np.max(np.abs(St_viol)),
                 )
             )
 
-            return {
-                "obj": self.model.get_objective("objective").value(),
-                "time": self.model.get_value("_solve_time"),
-                "gen": gen_df,
-                "bus": bus_df,
-                "lin": line_df,
-                "status": solver_status,
-                "max_viol": max_viol,
-            }
+            return results
 
         except Exception:
             print("=======Error: No solution found:")
-            return {"obj": None, "time": None, "gen": None, "bus": None, "lin": None, "status": solver_status, "max_viol": None}
-
-    def close_lines(self, edge_index, level=1):
-        """Find the indexes of edges close to the given edge up to a specified level.
-        Parameters:
-        edge_index (int): Index of the edge for which to find close edges.
-        level (int): Depth of adjacency to consider (1 for adjacent, 2 for adjacent of adjacent, etc.).
-        Returns:
-        list: Indexes of edges connected to the same f_bus or t_bus up to the specified level, excluding the given edge.
-        """
-        visited_edges = set()
-        current_edges = {edge_index}
-
-        for _ in range(level):
-            next_edges = set()
-            for edge in current_edges:
-                branch = self.branches.iloc[edge]
-                f_bus = int(branch["F_BUS"])
-                t_bus = int(branch["T_BUS"])
-                close_edges = self.branches[
-                    (
-                        (self.branches["F_BUS"] == f_bus)
-                        | (self.branches["T_BUS"] == f_bus)
-                        | (self.branches["F_BUS"] == t_bus)
-                        | (self.branches["T_BUS"] == t_bus)
-                    )
-                    & (~self.branches.index.isin(visited_edges))
-                ].index.tolist()
-                next_edges.update(close_edges)
-            visited_edges.update(current_edges)
-            current_edges = next_edges
-
-        visited_edges.discard(edge_index)
-        return list(visited_edges)
+            results = type("Results", (object,), {})()
+            results.obj = None
+            results.time = None
+            results.generators = None
+            results.buses = None
+            results.branches = None
+            results.status = solver_status
+            results.max_viol = None
+            return results
