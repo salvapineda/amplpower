@@ -313,15 +313,23 @@ class PowerSystem:
         self.ubcost = max_marginal_cost * self.buses["PD"].sum() * self.baseMVA + self.gencost["COST_0"].sum()
 
     def set_switching(self, switching):
-        """Set the switching status of the branches."""
+        """Set the switching status of the branches.
+        Switching statuses:
+        0: The line is off.
+        1: The line is on.
+        2: The line is switchable and modeled with a non-linear approach.
+        3: The line is switchable and modeled with a Big-M approach.
+        Parameters:
+        switching (str or np.ndarray): The switching strategy or array of statuses.
+        """
         if isinstance(switching, np.ndarray):
-            self.branches["BR_STATUS"] = switching
+            self.branches["BR_SWITCH"] = switching
         elif switching == "off":
-            self.branches["BR_STATUS"] = 1
+            self.branches["BR_SWITCH"] = 1
         elif switching == "nl":
-            self.branches["BR_STATUS"] = 2
+            self.branches["BR_SWITCH"] = 2
         elif switching == "bigm":
-            self.branches["BR_STATUS"] = 3
+            self.branches["BR_SWITCH"] = 3
 
     def create_model(self, opf_type="dc", connectivity="off"):
         """Compute the feasible region for the power system.
@@ -473,7 +481,7 @@ class PowerSystem:
             )
 
             # Get the line results
-            switching = self.model.get_variable("status").get_values().to_pandas().values.flatten()
+            status = self.model.get_variable("status").get_values().to_pandas().values.flatten()
             Pf = self.model.get_variable("Pf").get_values().to_pandas().values.flatten()
             Pfa = self.model.get_variable("Pfa").get_values().to_pandas().values.flatten()
             Pt = self.model.get_variable("Pt").get_values().to_pandas().values.flatten()
@@ -496,7 +504,7 @@ class PowerSystem:
             )
             results.branches = pd.DataFrame(
                 {
-                    "switching": switching,
+                    "status": status,
                     "Pf": Pf,
                     "Pt": Pt,
                     "Qf": Qf,
@@ -566,7 +574,7 @@ class PowerSystem:
             # Set other attributes
             results.obj = self.model.get_objective("objective").value()
             results.time = self.model.get_value("_solve_time")
-            results.status = solver_status
+            results.solver_status = solver_status
             results.max_viol = float(
                 max(
                     np.max(np.abs(Pg_viol)),
@@ -588,6 +596,6 @@ class PowerSystem:
             results.generators = None
             results.buses = None
             results.branches = None
-            results.status = solver_status
+            results.solver_status = solver_status
             results.max_viol = None
             return results

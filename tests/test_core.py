@@ -25,7 +25,7 @@ def test_opf(opf_type, solver):
     print(results.generators)
     print(results.buses)
     print(results.branches)
-    assert results.status is not None
+    assert results.solver_status is not None
 
 
 @pytest.mark.parametrize("opf_type", ["dc", "acjabr", "acrect", "acpolar"])
@@ -38,4 +38,4 @@ def test_ots(opf_type, switching):
     print(results.generators)
     print(results.buses)
     print(results.branches)
-    assert results.status is not None
+    assert results.solver_status is not None

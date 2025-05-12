@@ -8,6 +8,7 @@ Changelog
 * Add OBBT function to maximize/minimize other variables
 * Add upper bound to total generation cost
 * Split creat model and solve model for clarity
+* Change result output
 
 0.0.24 (2025-05-05)
 -------------------

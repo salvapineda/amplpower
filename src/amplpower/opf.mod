@@ -63,6 +63,7 @@ param RATE_C {L};
 param TAP {L};
 param SHIFT {L};
 param BR_STATUS {L};
+param BR_SWITCH {L};
 param ANGMIN {L};
 param ANGMAX {L};
 param VG {G};
@@ -155,170 +156,170 @@ subject to active_power_balance_3_4 {n in N: OPF_TYPE = 'acrect' or OPF_TYPE = '
 subject to reactive_power_balance_3_4 {n in N: OPF_TYPE = 'acrect' or OPF_TYPE = 'acjabr'}:
     sum {g in G} CG[g,n] * Qg[g] - QD[n] = -BS[n]*V2[n] + sum {l in L} (CF[l,n] * Qf[l] + CT[l,n] * Qt[l]);
 
-########## POWER FLOW DEFINITIONS (BR_STATUS = 0) ##########
+########## POWER FLOW DEFINITIONS (BR_SWITCH = 0) ##########
 
-subject to active_flow_from_0 {l in L:BR_STATUS[l] == 0}:
+subject to active_flow_from_0 {l in L:BR_SWITCH[l] == 0}:
     Pf[l] = 0;
 
-subject to active_flow_to_0 {l in L:BR_STATUS[l] == 0}:
+subject to active_flow_to_0 {l in L:BR_SWITCH[l] == 0}:
     Pt[l] = 0;
 
-subject to reactive_flow_from_0 {l in L:BR_STATUS[l] == 0}:
+subject to reactive_flow_from_0 {l in L:BR_SWITCH[l] == 0}:
     Qf[l] = 0;
 
-subject to reactive_flow_to_0 {l in L:BR_STATUS[l] == 0}:
+subject to reactive_flow_to_0 {l in L:BR_SWITCH[l] == 0}:
     Qt[l] = 0;
 
-########## POWER FLOW DEFINITIONS (BR_STATUS = 1) ##########
+########## POWER FLOW DEFINITIONS (BR_SWITCH = 1) ##########
 
-subject to active_flow_from_1 {l in L:OPF_TYPE='dc' and BR_STATUS[l] == 1}:
+subject to active_flow_from_1 {l in L:OPF_TYPE='dc' and BR_SWITCH[l] == 1}:
     Pf[l] = (1 / BR_X[l]) * (Va[F_BUS[l]] - Va[T_BUS[l]]);
 
-subject to active_flow_to_1 {l in L:OPF_TYPE='dc' and BR_STATUS[l] == 1}:
+subject to active_flow_to_1 {l in L:OPF_TYPE='dc' and BR_SWITCH[l] == 1}:
     Pt[l] = (1 / BR_X[l]) * (Va[T_BUS[l]] - Va[F_BUS[l]]);
 
-subject to active_flow_from_2 {l in L:OPF_TYPE='acpolar' and BR_STATUS[l] == 1}:
+subject to active_flow_from_2 {l in L:OPF_TYPE='acpolar' and BR_SWITCH[l] == 1}:
     Pf[l] = GFF[l]*Vm[F_BUS[l]]*Vm[F_BUS[l]] + Vm[F_BUS[l]]*Vm[T_BUS[l]]*(GFT[l]*cos(Va[F_BUS[l]]-Va[T_BUS[l]])+BFT[l]*sin(Va[F_BUS[l]]-Va[T_BUS[l]]));
 
-subject to active_flow_to_2 {l in L:OPF_TYPE='acpolar' and BR_STATUS[l] == 1}:
+subject to active_flow_to_2 {l in L:OPF_TYPE='acpolar' and BR_SWITCH[l] == 1}:
     Pt[l] = GTT[l]*Vm[T_BUS[l]]*Vm[T_BUS[l]] + Vm[F_BUS[l]]*Vm[T_BUS[l]]*(GTF[l]*cos(Va[T_BUS[l]]-Va[F_BUS[l]])+BTF[l]*sin(Va[T_BUS[l]]-Va[F_BUS[l]]));
 
-subject to reactive_flow_from_2 {l in L:OPF_TYPE='acpolar' and BR_STATUS[l] == 1}:
+subject to reactive_flow_from_2 {l in L:OPF_TYPE='acpolar' and BR_SWITCH[l] == 1}:
     Qf[l] = -BFF[l]*Vm[F_BUS[l]]*Vm[F_BUS[l]] - Vm[F_BUS[l]]*Vm[T_BUS[l]]*(BFT[l]*cos(Va[F_BUS[l]]-Va[T_BUS[l]])-GFT[l]*sin(Va[F_BUS[l]]-Va[T_BUS[l]]));
 
-subject to reactive_flow_to_2 {l in L:OPF_TYPE='acpolar' and BR_STATUS[l] == 1}:
+subject to reactive_flow_to_2 {l in L:OPF_TYPE='acpolar' and BR_SWITCH[l] == 1}:
     Qt[l] = -BTT[l]*Vm[T_BUS[l]]*Vm[T_BUS[l]] - Vm[F_BUS[l]]*Vm[T_BUS[l]]*(BTF[l]*cos(Va[T_BUS[l]]-Va[F_BUS[l]])-GTF[l]*sin(Va[T_BUS[l]]-Va[F_BUS[l]]));
 
-subject to active_flow_from_3_4 {l in L:(OPF_TYPE='acrect' or OPF_TYPE = 'acjabr') and BR_STATUS[l] == 1}:
+subject to active_flow_from_3_4 {l in L:(OPF_TYPE='acrect' or OPF_TYPE = 'acjabr') and BR_SWITCH[l] == 1}:
     Pf[l] = GFF[l]*V2[F_BUS[l]] + GFT[l]*cosft[l] + BFT[l]*sinft[l];
 
-subject to active_flow_to_3_4 {l in L:(OPF_TYPE='acrect' or OPF_TYPE = 'acjabr') and BR_STATUS[l] == 1}:
+subject to active_flow_to_3_4 {l in L:(OPF_TYPE='acrect' or OPF_TYPE = 'acjabr') and BR_SWITCH[l] == 1}:
     Pt[l] = GTT[l]*V2[T_BUS[l]] + GTF[l]*cosft[l] - BTF[l]*sinft[l];
 
-subject to reactive_flow_from_3_4 {l in L:(OPF_TYPE='acrect' or OPF_TYPE = 'acjabr') and BR_STATUS[l] == 1}:
+subject to reactive_flow_from_3_4 {l in L:(OPF_TYPE='acrect' or OPF_TYPE = 'acjabr') and BR_SWITCH[l] == 1}:
     Qf[l] = -BFF[l]*V2[F_BUS[l]] - BFT[l]*cosft[l] + GFT[l]*sinft[l];
 
-subject to reactive_flow_to_3_4 {l in L:(OPF_TYPE='acrect' or OPF_TYPE = 'acjabr') and BR_STATUS[l] == 1}:
+subject to reactive_flow_to_3_4 {l in L:(OPF_TYPE='acrect' or OPF_TYPE = 'acjabr') and BR_SWITCH[l] == 1}:
     Qt[l] = -BTT[l]*V2[T_BUS[l]] - BTF[l]*cosft[l] - GTF[l]*sinft[l];
 
-########## POWER FLOW DEFINITIONS (BR_STATUS = 2) ##########
+########## POWER FLOW DEFINITIONS (BR_SWITCH = 2) ##########
 
-subject to active_flow_from_1_switch {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 2}:
+subject to active_flow_from_1_switch {l in L: OPF_TYPE == 'dc' and BR_SWITCH[l] == 2}:
     Pf[l] = status[l] * (1 / BR_X[l]) * (Va[F_BUS[l]] - Va[T_BUS[l]]);
 
-subject to active_flow_to_1_switch {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 2}:
+subject to active_flow_to_1_switch {l in L: OPF_TYPE == 'dc' and BR_SWITCH[l] == 2}:
     Pt[l] = status[l] * (1 / BR_X[l]) * (Va[T_BUS[l]] - Va[F_BUS[l]]);
 
-subject to active_flow_from_2_switch {l in L: OPF_TYPE == 'acpolar' and BR_STATUS[l] == 2}:
+subject to active_flow_from_2_switch {l in L: OPF_TYPE == 'acpolar' and BR_SWITCH[l] == 2}:
     Pf[l] = status[l] * (GFF[l]*Vm[F_BUS[l]]*Vm[F_BUS[l]] + Vm[F_BUS[l]]*Vm[T_BUS[l]]*(GFT[l]*cos(Va[F_BUS[l]]-Va[T_BUS[l]])+BFT[l]*sin(Va[F_BUS[l]]-Va[T_BUS[l]])));
 
-subject to active_flow_to_2_switch {l in L: OPF_TYPE == 'acpolar' and BR_STATUS[l] == 2}:
+subject to active_flow_to_2_switch {l in L: OPF_TYPE == 'acpolar' and BR_SWITCH[l] == 2}:
     Pt[l] = status[l] * (GTT[l]*Vm[T_BUS[l]]*Vm[T_BUS[l]] + Vm[F_BUS[l]]*Vm[T_BUS[l]]*(GTF[l]*cos(Va[T_BUS[l]]-Va[F_BUS[l]])+BTF[l]*sin(Va[T_BUS[l]]-Va[F_BUS[l]])));
 
-subject to reactive_flow_from_2_switch {l in L: OPF_TYPE == 'acpolar' and BR_STATUS[l] == 2}:
+subject to reactive_flow_from_2_switch {l in L: OPF_TYPE == 'acpolar' and BR_SWITCH[l] == 2}:
     Qf[l] = status[l] * (-BFF[l]*Vm[F_BUS[l]]*Vm[F_BUS[l]] - Vm[F_BUS[l]]*Vm[T_BUS[l]]*(BFT[l]*cos(Va[F_BUS[l]]-Va[T_BUS[l]])-GFT[l]*sin(Va[F_BUS[l]]-Va[T_BUS[l]])));
 
-subject to reactive_flow_to_2_switch {l in L: OPF_TYPE == 'acpolar' and BR_STATUS[l] == 2}:
+subject to reactive_flow_to_2_switch {l in L: OPF_TYPE == 'acpolar' and BR_SWITCH[l] == 2}:
     Qt[l] = status[l] * (-BTT[l]*Vm[T_BUS[l]]*Vm[T_BUS[l]] - Vm[F_BUS[l]]*Vm[T_BUS[l]]*(BTF[l]*cos(Va[T_BUS[l]]-Va[F_BUS[l]])-GTF[l]*sin(Va[T_BUS[l]]-Va[F_BUS[l]])));
 
-subject to active_flow_from_3_4_switch {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 2}:
+subject to active_flow_from_3_4_switch {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 2}:
     Pf[l] = status[l] * (GFF[l]*V2[F_BUS[l]] + GFT[l]*cosft[l] + BFT[l]*sinft[l]);
 
-subject to active_flow_to_3_4_switch {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 2}:
+subject to active_flow_to_3_4_switch {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 2}:
     Pt[l] = status[l] * (GTT[l]*V2[T_BUS[l]] + GTF[l]*cosft[l] - BTF[l]*sinft[l]);
 
-subject to reactive_flow_from_3_4_switch {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 2}:
+subject to reactive_flow_from_3_4_switch {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 2}:
     Qf[l] = status[l] * (-BFF[l]*V2[F_BUS[l]] - BFT[l]*cosft[l] + GFT[l]*sinft[l]);
 
-subject to reactive_flow_to_3_4_switch {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 2}:
+subject to reactive_flow_to_3_4_switch {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 2}:
     Qt[l] = status[l] * (-BTT[l]*V2[T_BUS[l]] - BTF[l]*cosft[l] - GTF[l]*sinft[l]);
 
-########## POWER FLOW DEFINITIONS (BR_STATUS = 3) ##########
+########## POWER FLOW DEFINITIONS (BR_SWITCH = 3) ##########
 
-subject to active_flow_from_1_bigm {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
+subject to active_flow_from_1_bigm {l in L: OPF_TYPE == 'dc' and BR_SWITCH[l] == 3}:
     Pfa[l] = (1 / BR_X[l]) * (Va[F_BUS[l]] - Va[T_BUS[l]]);
 
-subject to active_flow_to_1_bigm {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
+subject to active_flow_to_1_bigm {l in L: OPF_TYPE == 'dc' and BR_SWITCH[l] == 3}:
     Pta[l] = (1 / BR_X[l]) * (Va[T_BUS[l]] - Va[F_BUS[l]]);
 
-subject to Pfa_lower_1 {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
+subject to Pfa_lower_1 {l in L: OPF_TYPE == 'dc' and BR_SWITCH[l] == 3}:
     PFLODC[l] * (1 - status[l]) <= -Pf[l] + Pfa[l];
 
-subject to Pfa_upper_1 {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
+subject to Pfa_upper_1 {l in L: OPF_TYPE == 'dc' and BR_SWITCH[l] == 3}:
     -Pf[l] + Pfa[l] <= PFUPDC[l] * (1 - status[l]);
 
-subject to Pta_lower_1 {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
+subject to Pta_lower_1 {l in L: OPF_TYPE == 'dc' and BR_SWITCH[l] == 3}:
     -PFUPDC[l] * (1 - status[l]) <= -Pt[l] + Pta[l];
 
-subject to Pta_upper_1 {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
+subject to Pta_upper_1 {l in L: OPF_TYPE == 'dc' and BR_SWITCH[l] == 3}:
     -Pt[l] + Pta[l] <= -PFLODC[l] * (1 - status[l]);
 
-subject to active_flow_from_2_bigm {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+subject to active_flow_from_2_bigm {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 3}:
     Pfa[l] = GFF[l] * V2[F_BUS[l]] + GFT[l] * cosft[l] + BFT[l] * sinft[l];
 
-subject to active_flow_to_2_bigm {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+subject to active_flow_to_2_bigm {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 3}:
     Pta[l] = GTT[l] * V2[T_BUS[l]] + GTF[l] * cosft[l] - BTF[l] * sinft[l];
 
-subject to reactive_flow_from_2_bigm {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+subject to reactive_flow_from_2_bigm {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 3}:
     Qfa[l] = -BFF[l] * V2[F_BUS[l]] - BFT[l] * cosft[l] + GFT[l] * sinft[l];
 
-subject to reactive_flow_to_2_bigm {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+subject to reactive_flow_to_2_bigm {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 3}:
     Qta[l] = -BTT[l] * V2[T_BUS[l]] - BTF[l] * cosft[l] - GTF[l] * sinft[l];
 
-subject to Pfa_lower_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+subject to Pfa_lower_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 3}:
     PFLOAC[l] * (1 - status[l]) <= -Pf[l] + Pfa[l];
 
-subject to Pfa_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+subject to Pfa_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 3}:
     -Pf[l] + Pfa[l] <= PFUPAC[l] * (1 - status[l]);
 
-subject to Pta_lower_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+subject to Pta_lower_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 3}:
     PTLOAC[l] * (1 - status[l]) <= -Pt[l] + Pta[l];
 
-subject to Pta_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+subject to Pta_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 3}:
     -Pt[l] + Pta[l] <= PTUPAC[l] * (1 - status[l]);
 
-subject to Qfa_lower_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+subject to Qfa_lower_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 3}:
     QFLOAC[l] * (1 - status[l]) <= -Qf[l] + Qfa[l];
 
-subject to Qfa_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+subject to Qfa_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 3}:
     -Qf[l] + Qfa[l] <= QFUPAC[l] * (1 - status[l]);
 
-subject to Qta_lower_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+subject to Qta_lower_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 3}:
     QTLOAC[l] * (1 - status[l]) <= -Qt[l] + Qta[l];
 
-subject to Qta_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+subject to Qta_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 3}:
     -Qt[l] + Qta[l] <= QTUPAC[l] * (1 - status[l]);
 
 ########## POWER FLOW LIMITS ##########
 
-subject to flowf_limits_1 {l in L:OPF_TYPE='dc' and (BR_STATUS[l] == 1 or BR_STATUS[l] == 2)}:
+subject to flowf_limits_1 {l in L:OPF_TYPE='dc' and (BR_SWITCH[l] == 1 or BR_SWITCH[l] == 2)}:
     -RATE_A[l] <= Pf[l] <= RATE_A[l];
 
-subject to flowt_limits_1 {l in L:OPF_TYPE='dc' and (BR_STATUS[l] == 1 or BR_STATUS[l] == 2)}:
+subject to flowt_limits_1 {l in L:OPF_TYPE='dc' and (BR_SWITCH[l] == 1 or BR_SWITCH[l] == 2)}:
     -RATE_A[l] <= Pt[l] <= RATE_A[l];
 
-subject to flowf_limits_dc_lower {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
+subject to flowf_limits_dc_lower {l in L: OPF_TYPE == 'dc' and BR_SWITCH[l] == 3}:
     Pf[l] >= -RATE_A[l] * status[l];
 
-subject to flowf_limits_dc_upper {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
+subject to flowf_limits_dc_upper {l in L: OPF_TYPE == 'dc' and BR_SWITCH[l] == 3}:
     Pf[l] <= RATE_A[l] * status[l];
 
-subject to flowt_limits_dc_lower {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
+subject to flowt_limits_dc_lower {l in L: OPF_TYPE == 'dc' and BR_SWITCH[l] == 3}:
     Pt[l] >= -RATE_A[l] * status[l];
 
-subject to flowt_limits_dc_upper {l in L: OPF_TYPE == 'dc' and BR_STATUS[l] == 3}:
+subject to flowt_limits_dc_upper {l in L: OPF_TYPE == 'dc' and BR_SWITCH[l] == 3}:
     Pt[l] <= RATE_A[l] * status[l];
 
-subject to flow_limits_from_23_4 {l in L:(OPF_TYPE='acpolar' or OPF_TYPE = 'acrect' or OPF_TYPE = 'acjabr') and (BR_STATUS[l] == 1 or BR_STATUS[l] == 2)}:
+subject to flow_limits_from_23_4 {l in L:(OPF_TYPE='acpolar' or OPF_TYPE = 'acrect' or OPF_TYPE = 'acjabr') and (BR_SWITCH[l] == 1 or BR_SWITCH[l] == 2)}:
     Pf[l]^2 + Qf[l]^2 <= RATE_A[l]^2;
 
-subject to flow_limits_to_23_4 {l in L:(OPF_TYPE='acpolar' or OPF_TYPE = 'acrect' or OPF_TYPE = 'acjabr') and (BR_STATUS[l] == 1 or BR_STATUS[l] == 2)}:
+subject to flow_limits_to_23_4 {l in L:(OPF_TYPE='acpolar' or OPF_TYPE = 'acrect' or OPF_TYPE = 'acjabr') and (BR_SWITCH[l] == 1 or BR_SWITCH[l] == 2)}:
     Pt[l]^2 + Qt[l]^2 <= RATE_A[l]^2;
 
-subject to flow_limits_from_acrect {l in L: (OPF_TYPE == 'acpolar' or OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+subject to flow_limits_from_acrect {l in L: (OPF_TYPE == 'acpolar' or OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 3}:
     Pf[l]^2 + Qf[l]^2 <= RATE_A[l]^2 * status[l];
 
-subject to flow_limits_to_acrect {l in L: (OPF_TYPE == 'acpolar' or OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_STATUS[l] == 3}:
+subject to flow_limits_to_acrect {l in L: (OPF_TYPE == 'acpolar' or OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') and BR_SWITCH[l] == 3}:
     Pt[l]^2 + Qt[l]^2 <= RATE_A[l]^2 * status[l];
 
 ########## RECTANGULAR DEFINITIONS ##########
@@ -349,7 +350,7 @@ subject to eq_slack_imag:
 
 ########## CONNECTIVITY CONSTRAINTS ##########
 
-subject to status_split {l in L: CONNECTIVITY = 'on' and (BR_STATUS[l] == 2 or BR_STATUS[l] == 3)}:
+subject to status_split {l in L: CONNECTIVITY = 'on' and (BR_SWITCH[l] == 2 or BR_SWITCH[l] == 3)}:
     statusf[l] + statust[l] == status[l];
 
 subject to connectivity {n in N: CONNECTIVITY = 'on'}:
@@ -366,10 +367,10 @@ subject to eq_slack_mtz:
 
 ########## STATUS FIX ##########
 
-subject to fix_status_0 {l in L: BR_STATUS[l] == 0}:
+subject to fix_status_0 {l in L: BR_SWITCH[l] == 0}:
     status[l] == 0;
 
-subject to fix_status_1 {l in L: BR_STATUS[l] == 1}:
+subject to fix_status_1 {l in L: BR_SWITCH[l] == 1}:
     status[l] == 1;
 
 # TODO: Split AMPL models?
