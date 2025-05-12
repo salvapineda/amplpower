@@ -9,6 +9,7 @@ Changelog
 * Add upper bound to total generation cost
 * Split creat model and solve model for clarity
 * Change result output
+* The AMPL model is now stored in self.ampl and can be modified by user
 
 0.0.24 (2025-05-05)
 -------------------

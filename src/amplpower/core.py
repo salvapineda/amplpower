@@ -338,20 +338,20 @@ class PowerSystem:
         connectivity (str): Connectivity for topology solutions ('off', 'on')
         """
         print(f"=======Computing feasible region ({opf_type}) with connectivity {connectivity}")
-        self.model = AMPL()
-        self.model.reset()
-        self.model.read(Path(__file__).parent / "opf.mod")
-        self.model.set_data(self.buses, "N")
-        self.model.set_data(self.generators, "G")
-        self.model.set_data(self.branches, "L")
-        self.model.set_data(self.gencost)
-        self.model.param["CF"] = array2dict(self.cf)
-        self.model.param["CT"] = array2dict(self.ct)
-        self.model.param["CG"] = array2dict(self.cg)
-        self.model.param["OPF_TYPE"] = opf_type
-        self.model.param["CONNECTIVITY"] = connectivity
-        self.model.param["BASEMVA"] = self.baseMVA
-        self.model.param["UBCOST"] = self.ubcost
+        self.ampl = AMPL()
+        self.ampl.reset()
+        self.ampl.read(Path(__file__).parent / "opf.mod")
+        self.ampl.set_data(self.buses, "N")
+        self.ampl.set_data(self.generators, "G")
+        self.ampl.set_data(self.branches, "L")
+        self.ampl.set_data(self.gencost)
+        self.ampl.param["CF"] = array2dict(self.cf)
+        self.ampl.param["CT"] = array2dict(self.ct)
+        self.ampl.param["CG"] = array2dict(self.cg)
+        self.ampl.param["OPF_TYPE"] = opf_type
+        self.ampl.param["CONNECTIVITY"] = connectivity
+        self.ampl.param["BASEMVA"] = self.baseMVA
+        self.ampl.param["UBCOST"] = self.ubcost
 
     def solve_model(self, solver="gurobi", options=""):
         """Solve the model using the specified solver.
@@ -362,8 +362,8 @@ class PowerSystem:
         dict: Results of the optimization
         """
         print(f"=======Solving model with solver {solver} and options {options}")
-        self.model.option[solver + "_options"] = options
-        self.model.solve(solver=solver)
+        self.ampl.option[solver + "_options"] = options
+        self.ampl.solve(solver=solver)
 
     def solve_opf(self, opf_type="dc", switching="off", connectivity="off", solver="gurobi", options=""):
         """Solve the optimal power flow problem using AMPL.
@@ -378,7 +378,7 @@ class PowerSystem:
         """
         self.set_switching(switching)
         self.create_model(opf_type, connectivity)
-        self.model.eval("minimize objective: total_cost;")
+        self.ampl.eval("minimize objective: total_cost;")
         self.solve_model(solver, options)
         return self.get_results_opf(opf_type)
 
@@ -397,20 +397,20 @@ class PowerSystem:
         direction, variable, line_index = obj.split("_")
         # closelines = self.close_lines(int(line_index), level=3)
         self.create_model(opf_type, connectivity)
-        self.model.eval(f"fix status[{line_index}]:=0;")
-        self.model.eval(f"{direction} newbound: {variable}[{line_index}];")
+        self.ampl.eval(f"fix status[{line_index}]:=0;")
+        self.ampl.eval(f"{direction} newbound: {variable}[{line_index}];")
         # for l in range(self.nlin):
         #    if l not in closelines:
-        #        self.model.eval(f"let status[{l}].relax :=1;")
-        self.model.eval("option relax_integrality 1;")
+        #        self.ampl.eval(f"let status[{l}].relax :=1;")
+        self.ampl.eval("option relax_integrality 1;")
         self.solve_model(solver, options)
-        solve_status = self.model.solve_result
+        solve_status = self.ampl.solve_result
         if solve_status == "solved":
-            return solve_status, self.model.get_objective("newbound").value()
+            return solve_status, self.ampl.get_objective("newbound").value()
         elif solve_status == "infeasible":
             return solve_status, None
         else:
-            return solve_status, self.model.get_value("newbound.bestbound")
+            return solve_status, self.ampl.get_value("newbound.bestbound")
 
     def close_lines(self, edge_index, level=1):
         """Find the indexes of edges close to the given edge up to a specified level.
@@ -450,14 +450,14 @@ class PowerSystem:
         Returns:
         object: Results of the optimization with attributes like obj, time, generators, buses, branches, etc.
         """
-        solver_status = self.model.solve_result
+        solver_status = self.ampl.solve_result
         try:
             # Create a simple object to hold results
             results = type("Results", (object,), {})()
 
             # Get the generation results
-            Pg = self.model.get_variable("Pg").get_values().to_pandas().values.flatten()
-            Qg = self.model.get_variable("Qg").get_values().to_pandas().values.flatten()
+            Pg = self.ampl.get_variable("Pg").get_values().to_pandas().values.flatten()
+            Qg = self.ampl.get_variable("Qg").get_values().to_pandas().values.flatten()
 
             # Avoid division by zero for Pg_viol
             pmax_pmin_diff = self.generators["PMAX"].values - self.generators["PMIN"].values
@@ -477,19 +477,19 @@ class PowerSystem:
 
             results.generators = pd.DataFrame(
                 {"Pg": Pg, "Qg": Qg, "Pg_viol": Pg_viol, "Qg_viol": Qg_viol},
-                index=self.model.get_variable("Pg").get_values().to_pandas().index,
+                index=self.ampl.get_variable("Pg").get_values().to_pandas().index,
             )
 
             # Get the line results
-            status = self.model.get_variable("status").get_values().to_pandas().values.flatten()
-            Pf = self.model.get_variable("Pf").get_values().to_pandas().values.flatten()
-            Pfa = self.model.get_variable("Pfa").get_values().to_pandas().values.flatten()
-            Pt = self.model.get_variable("Pt").get_values().to_pandas().values.flatten()
-            Pta = self.model.get_variable("Pta").get_values().to_pandas().values.flatten()
-            Qf = self.model.get_variable("Qf").get_values().to_pandas().values.flatten()
-            Qfa = self.model.get_variable("Qfa").get_values().to_pandas().values.flatten()
-            Qt = self.model.get_variable("Qt").get_values().to_pandas().values.flatten()
-            Qta = self.model.get_variable("Qta").get_values().to_pandas().values.flatten()
+            status = self.ampl.get_variable("status").get_values().to_pandas().values.flatten()
+            Pf = self.ampl.get_variable("Pf").get_values().to_pandas().values.flatten()
+            Pfa = self.ampl.get_variable("Pfa").get_values().to_pandas().values.flatten()
+            Pt = self.ampl.get_variable("Pt").get_values().to_pandas().values.flatten()
+            Pta = self.ampl.get_variable("Pta").get_values().to_pandas().values.flatten()
+            Qf = self.ampl.get_variable("Qf").get_values().to_pandas().values.flatten()
+            Qfa = self.ampl.get_variable("Qfa").get_values().to_pandas().values.flatten()
+            Qt = self.ampl.get_variable("Qt").get_values().to_pandas().values.flatten()
+            Qta = self.ampl.get_variable("Qta").get_values().to_pandas().values.flatten()
             Sf = Pf + 1j * Qf
             St = Pt + 1j * Qt
             Sf_viol = (
@@ -518,19 +518,19 @@ class PowerSystem:
                     "Qfa": Qfa,
                     "Qta": Qta,
                 },
-                index=self.model.get_variable("status").get_values().to_pandas().index,
+                index=self.ampl.get_variable("status").get_values().to_pandas().index,
             )
 
             # Get the voltage results
             if opf_type == "acrect":
-                volr = self.model.get_variable("Vr").get_values().to_pandas().values.flatten()
-                voli = self.model.get_variable("Vi").get_values().to_pandas().values.flatten()
+                volr = self.ampl.get_variable("Vr").get_values().to_pandas().values.flatten()
+                voli = self.ampl.get_variable("Vi").get_values().to_pandas().values.flatten()
                 Vm = np.sqrt(volr**2 + voli**2)
                 Va = np.arctan2(voli, volr)
             elif opf_type == "acjabr":
-                vol2 = self.model.get_variable("V2").get_values().to_pandas().values.flatten()
+                vol2 = self.ampl.get_variable("V2").get_values().to_pandas().values.flatten()
                 Vm = np.sqrt(vol2)
-                vfvtcosft = self.model.get_variable("cosft").get_values().to_pandas().values.flatten()
+                vfvtcosft = self.ampl.get_variable("cosft").get_values().to_pandas().values.flatten()
                 vfvt = np.array([Vm[int(self.branches.loc[i, "F_BUS"])] * Vm[int(self.branches.loc[i, "T_BUS"])] for i in range(self.nlin)])
                 cosft = np.maximum(-1, np.minimum(1, vfvtcosft / vfvt))
                 # Compute angles for all buses
@@ -549,8 +549,8 @@ class PowerSystem:
                             Va[f_bus] = Va[t_bus] - np.arccos(cosft[line_index])
                             visited.add(f_bus)
             else:
-                Vm = self.model.get_variable("Vm").get_values().to_pandas().values.flatten()
-                Va = self.model.get_variable("Va").get_values().to_pandas().values.flatten()
+                Vm = self.ampl.get_variable("Vm").get_values().to_pandas().values.flatten()
+                Va = self.ampl.get_variable("Va").get_values().to_pandas().values.flatten()
             Vm_viol = (
                 100
                 * np.maximum(0, Vm - self.buses["VMAX"].values, self.buses["VMIN"].values - Vm)
@@ -568,12 +568,12 @@ class PowerSystem:
                     "Vm_viol": Vm_viol,
                     "Va_viol": Va_viol,
                 },
-                index=self.model.get_variable("Vm").get_values().to_pandas().index,
+                index=self.ampl.get_variable("Vm").get_values().to_pandas().index,
             )
 
             # Set other attributes
-            results.obj = self.model.get_objective("objective").value()
-            results.time = self.model.get_value("_solve_time")
+            results.obj = self.ampl.get_objective("objective").value()
+            results.time = self.ampl.get_value("_solve_time")
             results.solver_status = solver_status
             results.max_viol = float(
                 max(
