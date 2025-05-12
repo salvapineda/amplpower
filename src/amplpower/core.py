@@ -395,13 +395,9 @@ class PowerSystem:
         Maximum or minimum value of the objective function
         """
         direction, variable, line_index = obj.split("_")
-        # closelines = self.close_lines(int(line_index), level=3)
         self.create_model(opf_type, connectivity)
         self.ampl.eval(f"fix status[{line_index}]:=0;")
         self.ampl.eval(f"{direction} newbound: {variable}[{line_index}];")
-        # for l in range(self.nlin):
-        #    if l not in closelines:
-        #        self.ampl.eval(f"let status[{l}].relax :=1;")
         self.ampl.eval("option relax_integrality 1;")
         self.solve_model(solver, options)
         solve_status = self.ampl.solve_result
@@ -411,39 +407,6 @@ class PowerSystem:
             return solve_status, None
         else:
             return solve_status, self.ampl.get_value("newbound.bestbound")
-
-    def close_lines(self, edge_index, level=1):
-        """Find the indexes of edges close to the given edge up to a specified level.
-        Parameters:
-        edge_index (int): Index of the edge for which to find close edges.
-        level (int): Depth of adjacency to consider (1 for adjacent, 2 for adjacent of adjacent, etc.).
-        Returns:
-        list: Indexes of edges connected to the same f_bus or t_bus up to the specified level, excluding the given edge.
-        """
-        visited_edges = set()
-        current_edges = {edge_index}
-
-        for _ in range(level):
-            next_edges = set()
-            for edge in current_edges:
-                branch = self.branches.iloc[edge]
-                f_bus = int(branch["F_BUS"])
-                t_bus = int(branch["T_BUS"])
-                close_edges = self.branches[
-                    (
-                        (self.branches["F_BUS"] == f_bus)
-                        | (self.branches["T_BUS"] == f_bus)
-                        | (self.branches["F_BUS"] == t_bus)
-                        | (self.branches["T_BUS"] == t_bus)
-                    )
-                    & (~self.branches.index.isin(visited_edges))
-                ].index.tolist()
-                next_edges.update(close_edges)
-            visited_edges.update(current_edges)
-            current_edges = next_edges
-
-        visited_edges.discard(edge_index)
-        return list(visited_edges)
 
     def get_results_opf(self, opf_type="dc"):
         """Get results from the solved model.
