@@ -382,32 +382,6 @@ class PowerSystem:
         self.solve_model(solver, options)
         return self.get_results_opf(opf_type)
 
-    def solve_obbt(self, obj="minimize_Pfa_1", opf_type="dc", connectivity="off", solver="gurobi", options=""):
-        """Solve the optimal power flow problem using OBBT.
-        Parameters:
-        obj (str): Objective function to be optimized ('max_pf_1', 'min_pf_1', 'max_pf_2', 'min_pf_2')
-        opf_type (str): Type of optimal power flow ('dc', 'acrect', 'acjabr')
-        switching (str): Switching strategy ('off', 'nl', 'bigm')
-        connectivity (str): Connectivity for topology solutions ('off', 'on')
-        solver (str): Solver to use ('gurobi', 'cplex', 'cbc')
-        options (str): Options for the solver
-        Returns:
-        Maximum or minimum value of the objective function
-        """
-        direction, variable, line_index = obj.split("_")
-        self.create_model(opf_type, connectivity)
-        self.ampl.eval(f"fix status[{line_index}]:=0;")
-        self.ampl.eval(f"{direction} newbound: {variable}[{line_index}];")
-        self.ampl.eval("option relax_integrality 1;")
-        self.solve_model(solver, options)
-        solve_status = self.ampl.solve_result
-        if solve_status == "solved":
-            return solve_status, self.ampl.get_objective("newbound").value()
-        elif solve_status == "infeasible":
-            return solve_status, None
-        else:
-            return solve_status, self.ampl.get_value("newbound.bestbound")
-
     def get_results_opf(self, opf_type="dc"):
         """Get results from the solved model.
         Returns:
