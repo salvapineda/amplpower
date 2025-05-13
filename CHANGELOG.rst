@@ -5,7 +5,6 @@ Changelog
 -------------------
 
 * Split solve_opf function
-* Add OBBT function to maximize/minimize other variables
 * Add upper bound to total generation cost
 * Split creat model and solve model for clarity
 * Change result output
