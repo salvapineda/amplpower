@@ -388,170 +388,156 @@ class PowerSystem:
         object: Results of the optimization with attributes like obj, time, generators, buses, branches, etc.
         """
         solver_status = self.ampl.solve_result
+
+        # Create a simple object to hold results
+        results = type("Results", (object,), {})()
+
+        # Get the generation results
+        Pg = self.ampl.get_variable("Pg").get_values().to_pandas().values.flatten()
+        Qg = self.ampl.get_variable("Qg").get_values().to_pandas().values.flatten()
+
+        # Avoid division by zero for Pg_viol
+        pmax_pmin_diff = self.generators["PMAX"].values - self.generators["PMIN"].values
+        Pg_viol = np.where(
+            pmax_pmin_diff == 0,
+            0,
+            100 * np.maximum(0, Pg - self.generators["PMAX"].values, self.generators["PMIN"].values - Pg) / pmax_pmin_diff,
+        )
+
+        # Avoid division by zero for Qg_viol
+        qmax_qmin_diff = self.generators["QMAX"].values - self.generators["QMIN"].values
+        Qg_viol = np.where(
+            qmax_qmin_diff == 0,
+            0,
+            100 * np.maximum(0, Qg - self.generators["QMAX"].values, self.generators["QMIN"].values - Qg) / qmax_qmin_diff,
+        )
+
+        results.generators = pd.DataFrame(
+            {"Pg": Pg, "Qg": Qg, "Pg_viol": Pg_viol, "Qg_viol": Qg_viol},
+            index=self.ampl.get_variable("Pg").get_values().to_pandas().index,
+        )
+
+        # Get the line results
+        status = self.ampl.get_variable("status").get_values().to_pandas().values.flatten()
+        Pf = self.ampl.get_variable("Pf").get_values().to_pandas().values.flatten()
+        Pfa = self.ampl.get_variable("Pfa").get_values().to_pandas().values.flatten()
+        Pt = self.ampl.get_variable("Pt").get_values().to_pandas().values.flatten()
+        Pta = self.ampl.get_variable("Pta").get_values().to_pandas().values.flatten()
+        Qf = self.ampl.get_variable("Qf").get_values().to_pandas().values.flatten()
+        Qfa = self.ampl.get_variable("Qfa").get_values().to_pandas().values.flatten()
+        Qt = self.ampl.get_variable("Qt").get_values().to_pandas().values.flatten()
+        Qta = self.ampl.get_variable("Qta").get_values().to_pandas().values.flatten()
+        Sf = Pf + 1j * Qf
+        St = Pt + 1j * Qt
+        Sf_viol = (
+            100
+            * np.maximum(0, abs(Sf) - self.branches["RATE_A"].values, -self.branches["RATE_A"].values - abs(Sf))
+            / (2 * self.branches["RATE_A"].values)
+        )
+        St_viol = (
+            100
+            * np.maximum(0, abs(St) - self.branches["RATE_A"].values, -self.branches["RATE_A"].values - abs(St))
+            / (2 * self.branches["RATE_A"].values)
+        )
+        results.branches = pd.DataFrame(
+            {
+                "status": status,
+                "Pf": Pf,
+                "Pt": Pt,
+                "Qf": Qf,
+                "Qt": Qt,
+                "Sf": abs(Sf),
+                "St": abs(St),
+                "Sf_viol": Sf_viol,
+                "St_viol": St_viol,
+                "Pfa": Pfa,
+                "Pta": Pta,
+                "Qfa": Qfa,
+                "Qta": Qta,
+            },
+            index=self.ampl.get_variable("status").get_values().to_pandas().index,
+        )
+
+        # Get the voltage results
+        if opf_type == "acrect":
+            volr = self.ampl.get_variable("Vr").get_values().to_pandas().values.flatten()
+            voli = self.ampl.get_variable("Vi").get_values().to_pandas().values.flatten()
+            Vm = np.sqrt(volr**2 + voli**2)
+            Va = np.arctan2(voli, volr)
+        elif opf_type == "acjabr":
+            vol2 = self.ampl.get_variable("V2").get_values().to_pandas().values.flatten()
+            Vm = np.sqrt(vol2)
+            vfvtcosft = self.ampl.get_variable("cosft").get_values().to_pandas().values.flatten()
+            vfvt = np.array([Vm[int(self.branches.loc[i, "F_BUS"])] * Vm[int(self.branches.loc[i, "T_BUS"])] for i in range(self.nlin)])
+            cosft = np.maximum(-1, np.minimum(1, vfvtcosft / vfvt))
+            # Compute angles for all buses
+            Va = np.full(self.nbus, np.nan)  # Initialize angles with NaN
+            Va[0] = 0  # Reference bus angle is 0
+            # Iteratively compute angles
+            visited = {0}  # Start with the reference bus
+            while len(visited) < self.nbus:
+                for line_index in range(self.nlin):
+                    f_bus = int(self.branches.loc[line_index, "F_BUS"])
+                    t_bus = int(self.branches.loc[line_index, "T_BUS"])
+                    if f_bus in visited and np.isnan(Va[t_bus]):
+                        Va[t_bus] = Va[f_bus] + np.arccos(cosft[line_index])
+                        visited.add(t_bus)
+                    elif t_bus in visited and np.isnan(Va[f_bus]):
+                        Va[f_bus] = Va[t_bus] - np.arccos(cosft[line_index])
+                        visited.add(f_bus)
+        else:
+            Vm = self.ampl.get_variable("Vm").get_values().to_pandas().values.flatten()
+            Va = self.ampl.get_variable("Va").get_values().to_pandas().values.flatten()
+        Vm_viol = (
+            100
+            * np.maximum(0, Vm - self.buses["VMAX"].values, self.buses["VMIN"].values - Vm)
+            / (self.buses["VMAX"].values - self.buses["VMIN"].values)
+        )
+        Va_viol = (
+            100
+            * np.maximum(0, Va - self.buses["AMAX"].values, self.buses["AMIN"].values - Va)
+            / (self.buses["AMAX"].values - self.buses["AMIN"].values)
+        )
+
+        # Computation of power injections
+        Sd = self.buses["PD"].values + 1j * self.buses["QD"].values
+        Sg = Pg + 1j * Qg
+        Ssh = self.buses["GS"].values * Vm**2 - 1j * self.buses["BS"].values * Vm**2
+        S_viol = Sg @ self.cg - Sd - Ssh - Sf @ self.cf - St @ self.ct
+        P_viol = 100 * np.real(S_viol) / sum(self.buses["PD"].values)
+        Q_viol = 100 * np.imag(S_viol) / sum(self.buses["QD"].values)
+
+        results.buses = pd.DataFrame(
+            {
+                "Vm": Vm,
+                "Va": Va,
+                "Vm_viol": Vm_viol,
+                "Va_viol": Va_viol,
+                "P_viol": P_viol,
+                "Q_viol": Q_viol,
+            },
+            index=self.ampl.get_variable("Vm").get_values().to_pandas().index,
+        )
+
+        # Set other attributes
+        results.obj = self.ampl.get_objective("objective").value()
         try:
-            # Create a simple object to hold results
-            results = type("Results", (object,), {})()
-
-            # Get the generation results
-            Pg = self.ampl.get_variable("Pg").get_values().to_pandas().values.flatten()
-            Qg = self.ampl.get_variable("Qg").get_values().to_pandas().values.flatten()
-
-            # Avoid division by zero for Pg_viol
-            pmax_pmin_diff = self.generators["PMAX"].values - self.generators["PMIN"].values
-            Pg_viol = np.where(
-                pmax_pmin_diff == 0,
-                0,
-                100 * np.maximum(0, Pg - self.generators["PMAX"].values, self.generators["PMIN"].values - Pg) / pmax_pmin_diff,
-            )
-
-            # Avoid division by zero for Qg_viol
-            qmax_qmin_diff = self.generators["QMAX"].values - self.generators["QMIN"].values
-            Qg_viol = np.where(
-                qmax_qmin_diff == 0,
-                0,
-                100 * np.maximum(0, Qg - self.generators["QMAX"].values, self.generators["QMIN"].values - Qg) / qmax_qmin_diff,
-            )
-
-            results.generators = pd.DataFrame(
-                {"Pg": Pg, "Qg": Qg, "Pg_viol": Pg_viol, "Qg_viol": Qg_viol},
-                index=self.ampl.get_variable("Pg").get_values().to_pandas().index,
-            )
-
-            # Get the line results
-            status = self.ampl.get_variable("status").get_values().to_pandas().values.flatten()
-            Pf = self.ampl.get_variable("Pf").get_values().to_pandas().values.flatten()
-            Pfa = self.ampl.get_variable("Pfa").get_values().to_pandas().values.flatten()
-            Pt = self.ampl.get_variable("Pt").get_values().to_pandas().values.flatten()
-            Pta = self.ampl.get_variable("Pta").get_values().to_pandas().values.flatten()
-            Qf = self.ampl.get_variable("Qf").get_values().to_pandas().values.flatten()
-            Qfa = self.ampl.get_variable("Qfa").get_values().to_pandas().values.flatten()
-            Qt = self.ampl.get_variable("Qt").get_values().to_pandas().values.flatten()
-            Qta = self.ampl.get_variable("Qta").get_values().to_pandas().values.flatten()
-            Sf = Pf + 1j * Qf
-            St = Pt + 1j * Qt
-            Sf_viol = (
-                100
-                * np.maximum(0, abs(Sf) - self.branches["RATE_A"].values, -self.branches["RATE_A"].values - abs(Sf))
-                / (2 * self.branches["RATE_A"].values)
-            )
-            St_viol = (
-                100
-                * np.maximum(0, abs(St) - self.branches["RATE_A"].values, -self.branches["RATE_A"].values - abs(St))
-                / (2 * self.branches["RATE_A"].values)
-            )
-            results.branches = pd.DataFrame(
-                {
-                    "status": status,
-                    "Pf": Pf,
-                    "Pt": Pt,
-                    "Qf": Qf,
-                    "Qt": Qt,
-                    "Sf": abs(Sf),
-                    "St": abs(St),
-                    "Sf_viol": Sf_viol,
-                    "St_viol": St_viol,
-                    "Pfa": Pfa,
-                    "Pta": Pta,
-                    "Qfa": Qfa,
-                    "Qta": Qta,
-                },
-                index=self.ampl.get_variable("status").get_values().to_pandas().index,
-            )
-
-            # Get the voltage results
-            if opf_type == "acrect":
-                volr = self.ampl.get_variable("Vr").get_values().to_pandas().values.flatten()
-                voli = self.ampl.get_variable("Vi").get_values().to_pandas().values.flatten()
-                Vm = np.sqrt(volr**2 + voli**2)
-                Va = np.arctan2(voli, volr)
-            elif opf_type == "acjabr":
-                vol2 = self.ampl.get_variable("V2").get_values().to_pandas().values.flatten()
-                Vm = np.sqrt(vol2)
-                vfvtcosft = self.ampl.get_variable("cosft").get_values().to_pandas().values.flatten()
-                vfvt = np.array([Vm[int(self.branches.loc[i, "F_BUS"])] * Vm[int(self.branches.loc[i, "T_BUS"])] for i in range(self.nlin)])
-                cosft = np.maximum(-1, np.minimum(1, vfvtcosft / vfvt))
-                # Compute angles for all buses
-                Va = np.full(self.nbus, np.nan)  # Initialize angles with NaN
-                Va[0] = 0  # Reference bus angle is 0
-                # Iteratively compute angles
-                visited = {0}  # Start with the reference bus
-                while len(visited) < self.nbus:
-                    for line_index in range(self.nlin):
-                        f_bus = int(self.branches.loc[line_index, "F_BUS"])
-                        t_bus = int(self.branches.loc[line_index, "T_BUS"])
-                        if f_bus in visited and np.isnan(Va[t_bus]):
-                            Va[t_bus] = Va[f_bus] + np.arccos(cosft[line_index])
-                            visited.add(t_bus)
-                        elif t_bus in visited and np.isnan(Va[f_bus]):
-                            Va[f_bus] = Va[t_bus] - np.arccos(cosft[line_index])
-                            visited.add(f_bus)
-            else:
-                Vm = self.ampl.get_variable("Vm").get_values().to_pandas().values.flatten()
-                Va = self.ampl.get_variable("Va").get_values().to_pandas().values.flatten()
-            Vm_viol = (
-                100
-                * np.maximum(0, Vm - self.buses["VMAX"].values, self.buses["VMIN"].values - Vm)
-                / (self.buses["VMAX"].values - self.buses["VMIN"].values)
-            )
-            Va_viol = (
-                100
-                * np.maximum(0, Va - self.buses["AMAX"].values, self.buses["AMIN"].values - Va)
-                / (self.buses["AMAX"].values - self.buses["AMIN"].values)
-            )
-
-            # Computation of power injections
-            Sd = self.buses["PD"].values + 1j * self.buses["QD"].values
-            Sg = Pg + 1j * Qg
-            Ssh = self.buses["GS"].values * Vm**2 - 1j * self.buses["BS"].values * Vm**2
-            S_viol = Sg @ self.cg - Sd - Ssh - Sf @ self.cf - St @ self.ct
-            P_viol = 100 * np.real(S_viol) / sum(self.buses["PD"].values)
-            Q_viol = 100 * np.imag(S_viol) / sum(self.buses["QD"].values)
-            # TODO: Check these violations terms, not sure this is the best way to compute them. Why not as p.u.?
-
-            results.buses = pd.DataFrame(
-                {
-                    "Vm": Vm,
-                    "Va": Va,
-                    "Vm_viol": Vm_viol,
-                    "Va_viol": Va_viol,
-                    "P_viol": P_viol,
-                    "Q_viol": Q_viol,
-                },
-                index=self.ampl.get_variable("Vm").get_values().to_pandas().index,
-            )
-
-            # Set other attributes
-            results.obj = self.ampl.get_objective("objective").value()
-            try:
-                results.bestbound = self.ampl.get_value("objective.bestbound")
-            except AttributeError:
-                results.bestbound = None
-            results.time = self.ampl.get_value("_solve_time")
-            results.solver_status = solver_status
-            results.max_viol = float(
-                max(
-                    np.max(np.abs(Pg_viol)),
-                    np.max(np.abs(Qg_viol)),
-                    np.max(np.abs(Vm_viol)),
-                    np.max(np.abs(Va_viol)),
-                    np.max(np.abs(Sf_viol)),
-                    np.max(np.abs(St_viol)),
-                    np.max(np.abs(P_viol)),
-                    np.max(np.abs(Q_viol)),
-                )
-            )
-
-            return results
-
-        except Exception:
-            print("=======Error: No solution found:")
-            results = type("Results", (object,), {})()
-            results.obj = None
+            results.bestbound = self.ampl.get_value("objective.bestbound")
+        except RuntimeError:
             results.bestbound = None
-            results.time = None
-            results.generators = None
-            results.buses = None
-            results.branches = None
-            results.solver_status = solver_status
-            results.max_viol = None
-            return results
+        results.time = self.ampl.get_value("_solve_time")
+        results.solver_status = solver_status
+        results.max_viol = float(
+            max(
+                np.max(np.abs(Pg_viol)),
+                np.max(np.abs(Qg_viol)),
+                np.max(np.abs(Vm_viol)),
+                np.max(np.abs(Va_viol)),
+                np.max(np.abs(Sf_viol)),
+                np.max(np.abs(St_viol)),
+                np.max(np.abs(P_viol)),
+                np.max(np.abs(Q_viol)),
+            )
+        )
+
+        return results
