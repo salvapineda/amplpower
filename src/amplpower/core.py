@@ -498,12 +498,24 @@ class PowerSystem:
                 * np.maximum(0, Va - self.buses["AMAX"].values, self.buses["AMIN"].values - Va)
                 / (self.buses["AMAX"].values - self.buses["AMIN"].values)
             )
+
+            # Computation of power injections
+            Sd = self.buses["PD"].values + 1j * self.buses["QD"].values
+            Sg = Pg + 1j * Qg
+            Ssh = self.buses["GS"].values * Vm**2 - 1j * self.buses["BS"].values * Vm**2
+            S_viol = Sg @ self.cg - Sd - Ssh - Sf @ self.cf - St @ self.ct
+            P_viol = 100 * np.real(S_viol) / sum(self.buses["PD"].values)
+            Q_viol = 100 * np.imag(S_viol) / sum(self.buses["QD"].values)
+            # TODO: Check these violations terms, not sure this is the best way to compute them. Why not as p.u.?
+
             results.buses = pd.DataFrame(
                 {
                     "Vm": Vm,
                     "Va": Va,
                     "Vm_viol": Vm_viol,
                     "Va_viol": Va_viol,
+                    "P_viol": P_viol,
+                    "Q_viol": Q_viol,
                 },
                 index=self.ampl.get_variable("Vm").get_values().to_pandas().index,
             )
@@ -524,6 +536,8 @@ class PowerSystem:
                     np.max(np.abs(Va_viol)),
                     np.max(np.abs(Sf_viol)),
                     np.max(np.abs(St_viol)),
+                    np.max(np.abs(P_viol)),
+                    np.max(np.abs(Q_viol)),
                 )
             )
 
