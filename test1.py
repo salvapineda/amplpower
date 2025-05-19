@@ -227,7 +227,7 @@ def update_bigm(ps, opf_type="dc", connectivity="off", solver="gurobi", relax="a
 # Iterate over relax values
 results_df = pd.DataFrame(columns=["relax", "time_update_bigm", "objective", "ots_time"])
 # for relax in [ "all", 1, 2, "rand10", "rand20"]:
-for relax in ["gu", 1, 2, "rand10", "rand20"]:
+for relax in ["gurobi", 1, 2, "rand10", "rand20"]:
     print(f"Running update_bigm with relax={relax}")
 
     # Create a new PowerSystem instance for each iteration
