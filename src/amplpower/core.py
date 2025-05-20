@@ -37,7 +37,6 @@ class PowerSystem:
         self.compute_voltage_bounds()
         self.compute_bigm_dc()
         self.compute_bigm_ac()
-        self.compute_ub_cost()
 
     def load_data(self):
         """Load MATPOWER case data into DataFrames and convert to per unit."""
@@ -301,17 +300,6 @@ class PowerSystem:
             self.branches.loc[lin_index, "SINFTMAX"] = sin_max
             self.branches.loc[lin_index, "SINFTMIN"] = sin_min
 
-    def compute_ub_cost(self):
-        """Compute upper bound for the cost function."""
-        # compute the maximum marginal cost for each generator and take the maximum
-        max_marginal_cost = 0
-        for g in range(self.ngen):
-            max_marginal_cost = max(
-                max_marginal_cost,
-                self.gencost.loc[g, "COST_2"] * self.generators.loc[g, "PMAX"] * self.baseMVA + self.gencost.loc[g, "COST_1"],
-            )
-        self.ubcost = max_marginal_cost * self.buses["PD"].sum() * self.baseMVA + self.gencost["COST_0"].sum()
-
     def set_switching(self, switching):
         """Set the switching status of the branches.
         Switching statuses:
@@ -351,7 +339,6 @@ class PowerSystem:
         self.ampl.param["OPF_TYPE"] = opf_type
         self.ampl.param["CONNECTIVITY"] = connectivity
         self.ampl.param["BASEMVA"] = self.baseMVA
-        self.ampl.param["UBCOST"] = self.ubcost
 
     def solve_model(self, solver="gurobi", options=""):
         """Solve the model using the specified solver.

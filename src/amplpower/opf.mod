@@ -9,7 +9,6 @@ set L;
 param OPF_TYPE symbolic;
 param CONNECTIVITY symbolic;
 param BASEMVA;
-param UBCOST;
 param MAXANGLE;
 param MINANGLE;
 param COST_2 {G};
