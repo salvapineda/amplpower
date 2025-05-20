@@ -111,7 +111,6 @@ param VIMIN {N};
 
 ########## VARIABLES ##########
 
-var total_cost <= UBCOST;
 var Pg {g in G} >= PMIN[g], <= PMAX[g]:= PG0[g];
 var Qg {g in G} >= QMIN[g], <= QMAX[g]:= QG0[g];
 var Pf {l in L} >= -RATE_A[l], <=RATE_A[l] := PF0[l];
@@ -133,11 +132,6 @@ var u {n in N} >= 1, <= card(N);
 var status {l in L} binary;
 var statusf {l in L} binary;
 var statust {l in L} binary;
-
-########## COST DEFINITION ##########
-
-subject to cost_definition:
-    total_cost = sum {g in G} (COST_2[g] * (BASEMVA*Pg[g])^2 + COST_1[g] * (BASEMVA*Pg[g]) + COST_0[g]);
 
 ########## POWER BALANCE ##########
 

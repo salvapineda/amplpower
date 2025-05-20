@@ -1,6 +1,11 @@
 Changelog
 =========
 
+0.0.27 (2025-05-20)
+-------------------
+
+* Remove cost definition from the model due to bad scaling in constraints
+
 0.0.26 (2025-05-19)
 -------------------
 

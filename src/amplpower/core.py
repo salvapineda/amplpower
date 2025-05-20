@@ -378,7 +378,7 @@ class PowerSystem:
         """
         self.set_switching(switching)
         self.create_model(opf_type, connectivity)
-        self.ampl.eval("minimize objective: total_cost;")
+        self.ampl.eval("minimize objective: sum {g in G} (COST_2[g] * (BASEMVA*Pg[g])^2 + COST_1[g] * (BASEMVA*Pg[g]) + COST_0[g]);")
         self.solve_model(solver, options)
         return self.get_results_opf(opf_type)
 
