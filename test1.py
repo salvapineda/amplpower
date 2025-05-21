@@ -1,5 +1,3 @@
-import random  # Import random for random sampling
-
 import numpy as np
 import pandas as pd
 
@@ -41,143 +39,256 @@ def close_lines(ps, edge_index, level=1):
     return list(visited_edges)
 
 
-def update_bigm(ps, opf_type="dc", connectivity="off", solver="gurobi", relax="all"):
-    """Update the bounds for each line in the power system using a combined approach.
+def new_bound(ps, opf_type, connectivity, solver, direction, lin_index, fix_status, relaxed_lines):
+    """
+    Solves for the maximum or minimum value of Pfa[lin_index] with specified relaxed lines.
+
+    Parameters:
+    ps (PowerSystem): Power system instance.
+    opf_type (str): OPF type.
+    connectivity (str): Connectivity option.
+    solver (str): Solver name.
+    direction (str): "max" for maximization, "min" for minimization.
+    lin_index (int): Index of the line to optimize.
+    fix_status (int): 1 to force the line to be connected, 0 to force it to be disconnected.
+    relaxed_lines (list): List of line indices whose binary variables are relaxed.
+
+    Returns:
+    tuple: (new_bound_value, solve_status, solve_time)
+    """
+    ps.create_model(opf_type, connectivity)
+    ps.ampl.eval(f"fix status[{lin_index}]:={fix_status};")
+    if direction == "max":
+        ps.ampl.eval(f"maximize newbound: Pfa[{lin_index}];")
+    else:
+        ps.ampl.eval(f"minimize newbound: Pfa[{lin_index}];")
+    ps.ampl.eval(
+        f"subject to upper_bound_cost: sum {{g in G}} (COST_2[g] * (BASEMVA*Pg[g])^2 + COST_1[g] * (BASEMVA*Pg[g]) + COST_0[g]) <= {ps.ubcost};"
+    )
+    # Relax integrality for specified lines
+    for line in range(ps.nlin):
+        if line in relaxed_lines:
+            ps.ampl.eval(f"let status[{line}].relax := 1;")
+    options = "outlev=0 threads=1"
+    ps.solve_model(solver, options)
+    solve_status = ps.ampl.solve_result
+    solve_time = ps.ampl.get_value("_solve_time")
+    if solve_status == "solved":
+        new_bound_value = ps.ampl.get_objective("newbound").value()
+    else:
+        new_bound_value = None
+    return new_bound_value, solve_status, solve_time
+
+
+def update_bigm(ps, opf_type="dc", connectivity="off", solver="gurobi", mode="all"):
+    """
+    Update the bounds for each line in the power system using a combined approach.
+
     Parameters:
     ps (PowerSystem): An instance of the PowerSystem class.
     opf_type (str): Type of optimal power flow ('dc', 'acrect', 'acjabr').
     connectivity (str): Connectivity for topology solutions ('off', 'on').
     solver (str): Solver to use ('gurobi', 'cplex', 'cbc').
-    relax (str, int, or None): Relaxation strategy for binary variables:
-        - "all": Relax all binary variables (default).
-        - Any integer: Relax binary variables for lines not in `close_lines` at the specified level.
-        - "randX": Randomly select X% of lines, and relax integrality for all other lines (e.g., "rand10" for 10%).
-        - "gurobi": Do not relax any binary variables, but use strict mip options and use bestbound.
-        - None: Do not update Big-M bounds.
+    mode (str): Strategy for relaxing binary variables:
+        - "all": Relax all binary variables except the current line.
+        - "closeX": Relax binary variables for lines not in close_lines at the specified level X (e.g., "close1").
+        - "sorted": Same as "all" but processes lines in the order given by ranking_lines.
+    Returns:
+    tuple: (total_time, avg_improvement)
     """
-    if relax is None:
-        print("No Big-M update performed as relax is None.")
-        return 0  # Return 0 as no time is spent updating bounds.
+    total_time = 0
+    improvements = []
+    updated_bounds = []  # Store (line, type, f_bus, t_bus, old, new, improvement)
+    # Determine line order
+    if mode == "sorted":
+        line_order = ranking_lines(ps)
     else:
-        total_time = 0
-        options = "outlev=0 threads=1"
-        for lin_index in range(ps.nlin):
-            # Maximize Pfa
-            ps.create_model(opf_type, connectivity)
-            ps.ampl.eval(f"fix status[{lin_index}]:=0;")
-            ps.ampl.eval(f"maximize newbound: Pfa[{lin_index}];")
+        line_order = range(ps.nlin)
+    for lin_index in line_order:
+        # Determine relaxed lines based on mode
+        if mode == "all" or mode == "sorted":
+            relaxed_lines = [i for i in range(ps.nlin) if i != lin_index]
+        elif mode.startswith("close"):
+            try:
+                level = int(mode.replace("close", ""))
+            except Exception:
+                print(f"Invalid mode: {mode}. Skipping line {lin_index}.")
+                continue
+            close = set(close_lines(ps, lin_index, level=level))
+            relaxed_lines = [i for i in range(ps.nlin) if i not in close]
+        else:
+            print(f"Unknown mode: {mode}. Skipping line {lin_index}.")
+            continue
 
-            options = "outlev=0 threads=1"
-            if relax == "all":
-                ps.ampl.eval("option relax_integrality 1;")
-            elif isinstance(relax, int) and relax > 0:
-                relaxed_lines = close_lines(ps, lin_index, level=relax)
-                for lin_index in range(ps.nlin):
-                    if lin_index not in relaxed_lines:
-                        ps.ampl.eval(f"let status[{lin_index}].relax := 1;")
-            elif isinstance(relax, str) and relax.startswith("rand"):
-                try:
-                    percentage = int(relax[4:])
-                    if 1 <= percentage <= 99:
-                        num_lines_to_keep = max(1, int((percentage / 100) * ps.nlin))
-                        selected_lines = set(random.sample(range(ps.nlin), num_lines_to_keep))
-                        for line in range(ps.nlin):
-                            if line not in selected_lines:
-                                ps.ampl.eval(f"let status[{line}].relax := 1;")
-                    else:
-                        raise ValueError("Percentage out of range (1-99).")
-                except ValueError:
-                    print(f"Invalid relax value: {relax}. Skipping relaxation.")
-                    continue
-            elif relax == "gurobi":
-                options = "outlev=0 threads=1 timelimit=1 mip:bestbound=1"
+        # Get branch info once per line
+        f_bus = ps.branches.loc[lin_index, "F_BUS"]
+        t_bus = ps.branches.loc[lin_index, "T_BUS"]
+        rate_a = ps.branches.loc[lin_index, "RATE_A"]
 
-            ps.solve_model(solver, options)
-            solve_status = ps.ampl.solve_result
-            total_time += ps.ampl.get_value("_solve_time")
-            if solve_status == "solved":
-                if relax == "gurobi":
-                    new_bound = ps.ampl.get_value("newbound.bestbound")
-                else:
-                    new_bound = ps.ampl.get_objective("newbound").value()
-                current_bound = ps.branches.loc[lin_index, "PFUPDC"]
-                print(f"Line {lin_index} UP: {current_bound} -> {new_bound}")
-                ps.branches.loc[lin_index, "PFUPDC"] = np.ceil(100 * new_bound) / 100
-            elif solve_status == "infeasible":
-                print(f"Infeasible for line {lin_index}")
+        # Maximize Pfa with fix_status=0 (disconnected, update bounds)
+        max_bound_0, max_status_0, max_time_0 = new_bound(ps, opf_type, connectivity, solver, "max", lin_index, 0, relaxed_lines)
+        total_time += max_time_0
+        current_bound_up = ps.branches.loc[lin_index, "PFUPDC"]
+        if max_status_0 == "solved" and max_bound_0 is not None and current_bound_up != 0:
+            improvement_up_0 = abs((max_bound_0 - current_bound_up) / current_bound_up) * 100
+            ps.branches.loc[lin_index, "PFUPDC"] = np.ceil(100 * max_bound_0) / 100
+            print(f"Line {lin_index} UP (fix_status=0): {current_bound_up} -> {max_bound_0} ({improvement_up_0:.2f}%)")
+            if improvement_up_0 > 0.01:
+                updated_bounds.append(("UP-0", lin_index, f_bus, t_bus, current_bound_up, max_bound_0, improvement_up_0))
+        else:
+            improvement_up_0 = 0.0
+            if max_status_0 == "infeasible":
+                print(f"Infeasible for line {lin_index} (max, fix_status=0)")
+        improvements.append(improvement_up_0)
 
-            # Minimize Pfa
-            ps.create_model(opf_type, connectivity)
-            ps.ampl.eval(f"fix status[{lin_index}]:=0;")
-            ps.ampl.eval(f"minimize newbound: Pfa[{lin_index}];")
+        # Maximize Pfa with fix_status=1 (connected, do not update bounds)
+        max_bound_1, max_status_1, max_time_1 = new_bound(ps, opf_type, connectivity, solver, "max", lin_index, 1, relaxed_lines)
+        total_time += max_time_1
+        current_bound_up_1 = rate_a  # Use RATE_A as the reference bound
+        if max_status_1 == "solved" and max_bound_1 is not None and current_bound_up_1 != 0:
+            improvement_up_1 = abs((max_bound_1 - current_bound_up_1) / current_bound_up_1) * 100
+            print(f"Line {lin_index} UP (fix_status=1): {current_bound_up_1} -> {max_bound_1} ({improvement_up_1:.2f}%)")
+            if improvement_up_1 > 0.01:
+                updated_bounds.append(("UP-1", lin_index, f_bus, t_bus, current_bound_up_1, max_bound_1, improvement_up_1))
+        else:
+            improvement_up_1 = 0.0
+            if max_status_1 == "infeasible":
+                print(f"Infeasible for line {lin_index} (max, fix_status=1)")
+        improvements.append(improvement_up_1)
 
-            options = "outlev=0 threads=1"
-            if relax == "all":
-                ps.ampl.eval("option relax_integrality 1;")
-            elif isinstance(relax, int) and relax > 0:
-                relaxed_lines = close_lines(ps, lin_index, level=relax)
-                for lin_index in range(ps.nlin):
-                    if lin_index not in relaxed_lines:
-                        ps.ampl.eval(f"let status[{lin_index}].relax := 1;")
-            elif isinstance(relax, str) and relax.startswith("rand"):
-                try:
-                    percentage = int(relax[4:])
-                    if 1 <= percentage <= 99:
-                        num_lines_to_keep = max(1, int((percentage / 100) * ps.nlin))
-                        selected_lines = set(random.sample(range(ps.nlin), num_lines_to_keep))
-                        for line in range(ps.nlin):
-                            if line not in selected_lines:
-                                ps.ampl.eval(f"let status[{line}].relax := 1;")
-                    else:
-                        raise ValueError("Percentage out of range (1-99).")
-                except ValueError:
-                    print(f"Invalid relax value: {relax}. Skipping relaxation.")
-                    continue
-            elif relax == "gurobi":
-                options = "outlev=0 threads=1 timelimit=1 mip:bestbound=1"
+        # Minimize Pfa with fix_status=0 (disconnected, update bounds)
+        min_bound_0, min_status_0, min_time_0 = new_bound(ps, opf_type, connectivity, solver, "min", lin_index, 0, relaxed_lines)
+        total_time += min_time_0
+        current_bound_lo = ps.branches.loc[lin_index, "PFLODC"]
+        if min_status_0 == "solved" and min_bound_0 is not None and current_bound_lo != 0:
+            improvement_lo_0 = abs((min_bound_0 - current_bound_lo) / current_bound_lo) * 100
+            ps.branches.loc[lin_index, "PFLODC"] = np.floor(100 * min_bound_0) / 100
+            print(f"Line {lin_index} LO (fix_status=0): {current_bound_lo} -> {min_bound_0} ({improvement_lo_0:.2f}%)")
+            if improvement_lo_0 > 0.01:
+                updated_bounds.append(("LO-0", lin_index, f_bus, t_bus, current_bound_lo, min_bound_0, improvement_lo_0))
+        else:
+            improvement_lo_0 = 0.0
+            if min_status_0 == "infeasible":
+                print(f"Infeasible for line {lin_index} (min, fix_status=0)")
+        improvements.append(improvement_lo_0)
 
-            ps.solve_model(solver, options)
-            solve_status = ps.ampl.solve_result
-            total_time += ps.ampl.get_value("_solve_time")
-            if solve_status == "solved":
-                if relax == "gurobi":
-                    new_bound = ps.ampl.get_value("newbound.bestbound")
-                else:
-                    new_bound = ps.ampl.get_objective("newbound").value()
-                current_bound = ps.branches.loc[lin_index, "PFLODC"]
-                print(f"Line {lin_index} LO: {current_bound} -> {new_bound}")
-                ps.branches.loc[lin_index, "PFLODC"] = np.floor(100 * new_bound) / 100
-            elif solve_status == "infeasible":
-                print(f"Infeasible for line {lin_index}")
+        # Minimize Pfa with fix_status=1 (connected, do not update bounds)
+        min_bound_1, min_status_1, min_time_1 = new_bound(ps, opf_type, connectivity, solver, "min", lin_index, 1, relaxed_lines)
+        total_time += min_time_1
+        current_bound_lo_1 = -rate_a  # Use -RATE_A as the reference bound
+        if min_status_1 == "solved" and min_bound_1 is not None and current_bound_lo_1 != 0:
+            improvement_lo_1 = abs((min_bound_1 - current_bound_lo_1) / current_bound_lo_1) * 100
+            print(f"Line {lin_index} LO (fix_status=1): {current_bound_lo_1} -> {min_bound_1} ({improvement_lo_1:.2f}%)")
+            if improvement_lo_1 > 0.01:
+                updated_bounds.append(("LO-1", lin_index, f_bus, t_bus, current_bound_lo_1, min_bound_1, improvement_lo_1))
+        else:
+            improvement_lo_1 = 0.0
+            if min_status_1 == "infeasible":
+                print(f"Infeasible for line {lin_index} (min, fix_status=1)")
+        improvements.append(improvement_lo_1)
 
-        print(f"Total time for updating bounds: {total_time:.2f} seconds")
-        return total_time
+    avg_improvement = np.mean(improvements) if improvements else 0.0
+    print(f"Total time for updating bounds: {total_time:.2f} seconds")
+    print(f"Average percentage improvement: {avg_improvement:.2f}%")
+    # Print all updated bounds with improvement > 0%
+    print("Updated bounds with improvement > 0%:")
+    for bound_type, lin_index, f_bus, t_bus, old, new, imp in updated_bounds:
+        print(f"Line {lin_index} ({f_bus}-{t_bus}) {bound_type}: {old} -> {new} ({imp:.2f}%)")
+    return total_time, avg_improvement
 
 
-# Iterate over relax values
-results_df = pd.DataFrame(columns=["relax", "time_update_bigm", "objective", "ots_time"])
-# for relax in [ "all", 1, 2, "rand10", "rand20"]:
-for relax in ["gurobi", 1, 2, "rand10", "rand20"]:
-    print(f"Running update_bigm with relax={relax}")
+def ranking_nodes(ps):
+    """
+    Returns a list of nodes (buses) sorted by the number of lines connected to each node, in descending order.
+    Nodes with the most connections appear first, while leaf nodes (with the fewest connections) appear last.
+
+    Parameters:
+    ps (PowerSystem): An instance of the PowerSystem class, which must have a 'branches' DataFrame
+                      with columns 'F_BUS' and 'T_BUS' representing the from and to buses of each line.
+
+    Returns:
+    list: List of node identifiers (bus numbers), sorted from most to least connected.
+    """
+    # Count connections per node
+    f_counts = ps.branches["F_BUS"].value_counts()
+    t_counts = ps.branches["T_BUS"].value_counts()
+    total_counts = f_counts.add(t_counts, fill_value=0)
+    # Sort nodes by number of connections (descending)
+    sorted_nodes = total_counts.sort_values(ascending=False).index.tolist()
+    return sorted_nodes
+
+
+def lines_in_node(ps, node):
+    """
+    Returns a list of indices of lines connected to the specified node.
+
+    Parameters:
+    ps (PowerSystem): An instance of the PowerSystem class, which must have a 'branches' DataFrame
+                      with columns 'F_BUS' and 'T_BUS' representing the from and to buses of each line.
+    node (int): The node (bus) number for which to find all connected lines.
+
+    Returns:
+    list: List of indices (integers) of lines connected to the given node.
+    """
+    mask = (ps.branches["F_BUS"] == node) | (ps.branches["T_BUS"] == node)
+    return ps.branches[mask].index.tolist()
+
+
+def ranking_lines(ps):
+    """
+    Returns a list of line indices sorted by the importance of the nodes they are connected to.
+    Lines connected to higher-ranked nodes (from ranking_nodes) appear first.
+
+    Parameters:
+    ps (PowerSystem): An instance of the PowerSystem class.
+
+    Returns:
+    list: List of line indices, sorted by node importance.
+    """
+    node_ranking = ranking_nodes(ps)
+    node_rank_map = {node: rank for rank, node in enumerate(node_ranking)}
+    line_scores = []
+    for idx, branch in ps.branches.iterrows():
+        f_rank = node_rank_map.get(branch["F_BUS"], len(node_ranking))
+        t_rank = node_rank_map.get(branch["T_BUS"], len(node_ranking))
+        # Lower rank value means higher importance, so use min
+        line_score = min(f_rank, t_rank)
+        line_scores.append((idx, line_score))
+    # Sort lines by score (ascending: most important nodes first)
+    sorted_lines = [idx for idx, _ in sorted(line_scores, key=lambda x: x[1])]
+    return sorted_lines
+
+
+# Iterate over mode values
+results_df = pd.DataFrame(columns=["mode", "time_update_bigm", "improvement_bigm", "objective", "ots_time"])
+# for mode in ["all", "close1", "close2"]:
+for mode in ["all"]:
+    print(f"Running update_bigm with mode={mode}")
 
     # Create a new PowerSystem instance for each iteration
     ps = PowerSystem("./src/amplpower/data/case118Blumsack.m")
     ps.set_switching("bigm")
-    ps.ubcost = 1600
+    ps.ubcost = 1560
 
     # Update bounds and measure time
-    time_update_bigm = update_bigm(ps, relax=relax)
+    time_update_bigm, improvement_bigm = update_bigm(ps, mode=mode)
 
     # Solve OTS and compute results
-    ps.compute_ub_cost()
-    results_ots = ps.solve_opf(opf_type="dc", switching="bigm", solver="gurobi", options="outlev=1 threads=1 timelimit=100")
+    ps.ubcost = 16000
+    results_ots = ps.solve_opf(opf_type="dc", switching="bigm", solver="gurobi", options="outlev=1 threads=1 timelimit=10")
 
     # Append results to the DataFrame
     results_df = pd.concat(
         [
             results_df,
             pd.DataFrame(
-                {"relax": [relax], "time_update_bigm": [time_update_bigm], "objective": [results_ots.obj], "ots_time": [results_ots.time]}
+                {
+                    "mode": [mode],
+                    "time_update_bigm": [time_update_bigm],
+                    "improvement_bigm": [improvement_bigm],
+                    "objective": [results_ots.obj],
+                    "ots_time": [results_ots.time],
+                }
             ),
         ],
         ignore_index=True,
