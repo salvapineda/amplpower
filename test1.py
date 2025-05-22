@@ -104,6 +104,7 @@ def update_bigm(ps, opf_type="dc", connectivity="off", solver="gurobi", mode="al
         line_order = ranking_lines(ps)
     else:
         line_order = range(ps.nlin)
+    # First, update PFMAX and PFMIN with fix_status=1 for all lines
     for lin_index in line_order:
         # Determine relaxed lines based on mode
         if mode == "all" or mode == "sorted":
@@ -120,72 +121,95 @@ def update_bigm(ps, opf_type="dc", connectivity="off", solver="gurobi", mode="al
             print(f"Unknown mode: {mode}. Skipping line {lin_index}.")
             continue
 
-        # Get branch info once per line
         f_bus = ps.branches.loc[lin_index, "F_BUS"]
         t_bus = ps.branches.loc[lin_index, "T_BUS"]
-        rate_a = ps.branches.loc[lin_index, "RATE_A"]
 
-        # Maximize Pfa with fix_status=0 (disconnected, update bounds)
-        max_bound_0, max_status_0, max_time_0 = new_bound(ps, opf_type, connectivity, solver, "max", lin_index, 0, relaxed_lines)
-        total_time += max_time_0
-        current_bound_up = ps.branches.loc[lin_index, "PFUPDC"]
-        if max_status_0 == "solved" and max_bound_0 is not None and current_bound_up != 0:
-            improvement_up_0 = abs((max_bound_0 - current_bound_up) / current_bound_up) * 100
-            ps.branches.loc[lin_index, "PFUPDC"] = np.ceil(100 * max_bound_0) / 100
-            print(f"Line {lin_index} UP (fix_status=0): {current_bound_up} -> {max_bound_0} ({improvement_up_0:.2f}%)")
-            if improvement_up_0 > 0.01:
-                updated_bounds.append(("UP-0", lin_index, f_bus, t_bus, current_bound_up, max_bound_0, improvement_up_0))
-        else:
-            improvement_up_0 = 0.0
-            if max_status_0 == "infeasible":
-                print(f"Infeasible for line {lin_index} (max, fix_status=0)")
-        improvements.append(improvement_up_0)
-
-        # Maximize Pfa with fix_status=1 (connected, do not update bounds)
+        # Maximize Pfa with fix_status=1 (connected, update PFMAX)
         max_bound_1, max_status_1, max_time_1 = new_bound(ps, opf_type, connectivity, solver, "max", lin_index, 1, relaxed_lines)
         total_time += max_time_1
-        current_bound_up_1 = rate_a  # Use RATE_A as the reference bound
+        current_bound_up_1 = ps.branches.loc[lin_index, "PFMAX"]
         if max_status_1 == "solved" and max_bound_1 is not None and current_bound_up_1 != 0:
-            improvement_up_1 = abs((max_bound_1 - current_bound_up_1) / current_bound_up_1) * 100
-            print(f"Line {lin_index} UP (fix_status=1): {current_bound_up_1} -> {max_bound_1} ({improvement_up_1:.2f}%)")
+            rounded_max_bound_1 = np.ceil(1e10 * max_bound_1) / 1e10
+            ps.branches.loc[lin_index, "PFMAX"] = rounded_max_bound_1
+            improvement_up_1 = abs((rounded_max_bound_1 - current_bound_up_1) / current_bound_up_1) * 100
+            print(f"Line {lin_index} UP (fix_status=1): {current_bound_up_1} -> {rounded_max_bound_1} ({improvement_up_1:.2f}%)")
             if improvement_up_1 > 0.01:
-                updated_bounds.append(("UP-1", lin_index, f_bus, t_bus, current_bound_up_1, max_bound_1, improvement_up_1))
+                updated_bounds.append(("UP-1", lin_index, f_bus, t_bus, current_bound_up_1, rounded_max_bound_1, improvement_up_1))
         else:
             improvement_up_1 = 0.0
             if max_status_1 == "infeasible":
                 print(f"Infeasible for line {lin_index} (max, fix_status=1)")
         improvements.append(improvement_up_1)
 
-        # Minimize Pfa with fix_status=0 (disconnected, update bounds)
-        min_bound_0, min_status_0, min_time_0 = new_bound(ps, opf_type, connectivity, solver, "min", lin_index, 0, relaxed_lines)
-        total_time += min_time_0
-        current_bound_lo = ps.branches.loc[lin_index, "PFLODC"]
-        if min_status_0 == "solved" and min_bound_0 is not None and current_bound_lo != 0:
-            improvement_lo_0 = abs((min_bound_0 - current_bound_lo) / current_bound_lo) * 100
-            ps.branches.loc[lin_index, "PFLODC"] = np.floor(100 * min_bound_0) / 100
-            print(f"Line {lin_index} LO (fix_status=0): {current_bound_lo} -> {min_bound_0} ({improvement_lo_0:.2f}%)")
-            if improvement_lo_0 > 0.01:
-                updated_bounds.append(("LO-0", lin_index, f_bus, t_bus, current_bound_lo, min_bound_0, improvement_lo_0))
-        else:
-            improvement_lo_0 = 0.0
-            if min_status_0 == "infeasible":
-                print(f"Infeasible for line {lin_index} (min, fix_status=0)")
-        improvements.append(improvement_lo_0)
-
-        # Minimize Pfa with fix_status=1 (connected, do not update bounds)
+        # Minimize Pfa with fix_status=1 (connected, update PFMIN)
         min_bound_1, min_status_1, min_time_1 = new_bound(ps, opf_type, connectivity, solver, "min", lin_index, 1, relaxed_lines)
         total_time += min_time_1
-        current_bound_lo_1 = -rate_a  # Use -RATE_A as the reference bound
+        current_bound_lo_1 = ps.branches.loc[lin_index, "PFMIN"]
         if min_status_1 == "solved" and min_bound_1 is not None and current_bound_lo_1 != 0:
-            improvement_lo_1 = abs((min_bound_1 - current_bound_lo_1) / current_bound_lo_1) * 100
-            print(f"Line {lin_index} LO (fix_status=1): {current_bound_lo_1} -> {min_bound_1} ({improvement_lo_1:.2f}%)")
+            rounded_min_bound_1 = np.floor(1e10 * min_bound_1) / 1e10
+            ps.branches.loc[lin_index, "PFMIN"] = rounded_min_bound_1
+            improvement_lo_1 = abs((rounded_min_bound_1 - current_bound_lo_1) / current_bound_lo_1) * 100
+            print(f"Line {lin_index} LO (fix_status=1): {current_bound_lo_1} -> {rounded_min_bound_1} ({improvement_lo_1:.2f}%)")
             if improvement_lo_1 > 0.01:
-                updated_bounds.append(("LO-1", lin_index, f_bus, t_bus, current_bound_lo_1, min_bound_1, improvement_lo_1))
+                updated_bounds.append(("LO-1", lin_index, f_bus, t_bus, current_bound_lo_1, rounded_min_bound_1, improvement_lo_1))
         else:
             improvement_lo_1 = 0.0
             if min_status_1 == "infeasible":
                 print(f"Infeasible for line {lin_index} (min, fix_status=1)")
         improvements.append(improvement_lo_1)
+
+    # Then, update PFUPDC and PFLODC with fix_status=0 for all lines
+    for lin_index in line_order:
+        if mode == "all" or mode == "sorted":
+            relaxed_lines = [i for i in range(ps.nlin) if i != lin_index]
+        elif mode.startswith("close"):
+            try:
+                level = int(mode.replace("close", ""))
+            except Exception:
+                print(f"Invalid mode: {mode}. Skipping line {lin_index}.")
+                continue
+            close = set(close_lines(ps, lin_index, level=level))
+            relaxed_lines = [i for i in range(ps.nlin) if i not in close]
+        else:
+            print(f"Unknown mode: {mode}. Skipping line {lin_index}.")
+            continue
+
+        f_bus = ps.branches.loc[lin_index, "F_BUS"]
+        t_bus = ps.branches.loc[lin_index, "T_BUS"]
+
+        # Maximize Pfa with fix_status=0 (disconnected, update PFUPDC)
+        max_bound_0, max_status_0, max_time_0 = new_bound(ps, opf_type, connectivity, solver, "max", lin_index, 0, relaxed_lines)
+        total_time += max_time_0
+        current_bound_up = ps.branches.loc[lin_index, "PFUPDC"]
+        if max_status_0 == "solved" and max_bound_0 is not None and current_bound_up != 0:
+            rounded_max_bound_0 = np.ceil(1e10 * max_bound_0) / 1e10
+            ps.branches.loc[lin_index, "PFUPDC"] = rounded_max_bound_0
+            improvement_up_0 = abs((rounded_max_bound_0 - current_bound_up) / current_bound_up) * 100
+            print(f"Line {lin_index} UP (fix_status=0): {current_bound_up} -> {rounded_max_bound_0} ({improvement_up_0:.2f}%)")
+            if improvement_up_0 > 0.01:
+                updated_bounds.append(("UP-0", lin_index, f_bus, t_bus, current_bound_up, rounded_max_bound_0, improvement_up_0))
+        else:
+            improvement_up_0 = 0.0
+            if max_status_0 == "infeasible":
+                print(f"Infeasible for line {lin_index} (max, fix_status=0)")
+        improvements.append(improvement_up_0)
+
+        # Minimize Pfa with fix_status=0 (disconnected, update PFLODC)
+        min_bound_0, min_status_0, min_time_0 = new_bound(ps, opf_type, connectivity, solver, "min", lin_index, 0, relaxed_lines)
+        total_time += min_time_0
+        current_bound_lo = ps.branches.loc[lin_index, "PFLODC"]
+        if min_status_0 == "solved" and min_bound_0 is not None and current_bound_lo != 0:
+            rounded_min_bound_0 = np.floor(1e10 * min_bound_0) / 1e10
+            ps.branches.loc[lin_index, "PFLODC"] = rounded_min_bound_0
+            improvement_lo_0 = abs((rounded_min_bound_0 - current_bound_lo) / current_bound_lo) * 100
+            print(f"Line {lin_index} LO (fix_status=0): {current_bound_lo} -> {rounded_min_bound_0} ({improvement_lo_0:.2f}%)")
+            if improvement_lo_0 > 0.01:
+                updated_bounds.append(("LO-0", lin_index, f_bus, t_bus, current_bound_lo, rounded_min_bound_0, improvement_lo_0))
+        else:
+            improvement_lo_0 = 0.0
+            if min_status_0 == "infeasible":
+                print(f"Infeasible for line {lin_index} (min, fix_status=0)")
+        improvements.append(improvement_lo_0)
 
     avg_improvement = np.mean(improvements) if improvements else 0.0
     print(f"Total time for updating bounds: {total_time:.2f} seconds")
@@ -275,7 +299,7 @@ for mode in ["all"]:
 
     # Solve OTS and compute results
     ps.ubcost = 16000
-    results_ots = ps.solve_opf(opf_type="dc", switching="bigm", solver="gurobi", options="outlev=1 threads=1 timelimit=10")
+    results_ots = ps.solve_opf(opf_type="dc", switching="bigm", solver="gurobi", options="outlev=1 threads=1 timelimit=100")
 
     # Append results to the DataFrame
     results_df = pd.concat(
