@@ -59,6 +59,10 @@ param BR_B {L};
 param RATE_A {L};
 param RATE_B {L};
 param RATE_C {L};
+param PFMAX {L};
+param PFMIN {L};
+param QFMAX {L};
+param QFMIN {L};
 param TAP {L};
 param SHIFT {L};
 param BR_STATUS {L};
@@ -112,10 +116,10 @@ param VIMIN {N};
 
 var Pg {g in G} >= PMIN[g], <= PMAX[g]:= PG0[g];
 var Qg {g in G} >= QMIN[g], <= QMAX[g]:= QG0[g];
-var Pf {l in L} >= -RATE_A[l], <=RATE_A[l] := PF0[l];
-var Pt {l in L} >= -RATE_A[l], <=RATE_A[l] := PT0[l];
-var Qf {l in L} >= -RATE_A[l], <=RATE_A[l] := QF0[l];
-var Qt {l in L} >= -RATE_A[l], <=RATE_A[l] := QT0[l];
+var Pf {l in L} >= PFMIN[l], <= PFMAX[l] := PF0[l];
+var Pt {l in L} >= PFMIN[l], <= PFMAX[l] := PT0[l];
+var Qf {l in L} >= QFMIN[l], <= QFMAX[l] := QF0[l];
+var Qt {l in L} >= QFMIN[l], <= QFMAX[l] := QT0[l];
 var Vm {n in N} >= VMIN[n], <= VMAX[n] := VOL0[n];
 var Vr {n in N} >= VRMIN[n], <=VRMAX[n] := VOLR0[n];
 var Vi {n in N} >= VIMIN[n], <=VIMAX[n] := VOLI0[n];
@@ -286,22 +290,22 @@ subject to Qta_upper_2 {l in L: (OPF_TYPE == 'acrect' or OPF_TYPE == 'acjabr') a
 ########## POWER FLOW LIMITS ##########
 
 subject to flowf_limits_1 {l in L:OPF_TYPE='dc' and (BR_SWITCH[l] == 1 or BR_SWITCH[l] == 2)}:
-    -RATE_A[l] <= Pf[l] <= RATE_A[l];
+    PFMIN[l] <= Pf[l] <= PFMAX[l];
 
 subject to flowt_limits_1 {l in L:OPF_TYPE='dc' and (BR_SWITCH[l] == 1 or BR_SWITCH[l] == 2)}:
-    -RATE_A[l] <= Pt[l] <= RATE_A[l];
+    PFMIN[l] <= Pt[l] <= PFMAX[l];
 
 subject to flowf_limits_dc_lower {l in L: OPF_TYPE == 'dc' and BR_SWITCH[l] == 3}:
-    Pf[l] >= -RATE_A[l] * status[l];
+    Pf[l] >= PFMIN[l] * status[l];
 
 subject to flowf_limits_dc_upper {l in L: OPF_TYPE == 'dc' and BR_SWITCH[l] == 3}:
-    Pf[l] <= RATE_A[l] * status[l];
+    Pf[l] <= PFMAX[l] * status[l];
 
 subject to flowt_limits_dc_lower {l in L: OPF_TYPE == 'dc' and BR_SWITCH[l] == 3}:
-    Pt[l] >= -RATE_A[l] * status[l];
+    Pt[l] >= PFMIN[l] * status[l];
 
 subject to flowt_limits_dc_upper {l in L: OPF_TYPE == 'dc' and BR_SWITCH[l] == 3}:
-    Pt[l] <= RATE_A[l] * status[l];
+    Pt[l] <= PFMAX[l] * status[l];
 
 subject to flow_limits_from_23_4 {l in L:(OPF_TYPE='acpolar' or OPF_TYPE = 'acrect' or OPF_TYPE = 'acjabr') and (BR_SWITCH[l] == 1 or BR_SWITCH[l] == 2)}:
     Pf[l]^2 + Qf[l]^2 <= RATE_A[l]^2;

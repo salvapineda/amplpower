@@ -96,6 +96,12 @@ class PowerSystem:
                 if self.branches.loc[line_index, "RATE_A"] == 0:
                     self.branches.loc[line_index, "RATE_A"] = self.default_branch_limit
 
+            # Define PFMAX and PFMIN for branches
+            self.branches["PFMAX"] = self.branches["RATE_A"]
+            self.branches["PFMIN"] = -self.branches["RATE_A"]
+            self.branches["QFMAX"] = self.branches["RATE_A"]
+            self.branches["QFMIN"] = -self.branches["RATE_A"]
+
         except Exception as e:
             logging.error(f"Error loading data from {self.case_file}: {e}")
             raise
