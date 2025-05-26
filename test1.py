@@ -1,5 +1,7 @@
+import sys  # Import the sys module
+from pathlib import Path
+
 import numpy as np
-import pandas as pd
 
 from amplpower import PowerSystem
 
@@ -80,7 +82,7 @@ def new_bound(ps, opf_type, connectivity, solver, direction, lin_index, fix_stat
     return new_bound_value, solve_status, solve_time
 
 
-def update_bigm(ps, opf_type="dc", connectivity="off", solver="gurobi", mode="all"):
+def update_bigm(ps, opf_type="dc", connectivity="off", solver="gurobi", sorted="default", relax="all"):
     """
     Update the bounds for each line in the power system using a combined approach.
 
@@ -89,10 +91,14 @@ def update_bigm(ps, opf_type="dc", connectivity="off", solver="gurobi", mode="al
     opf_type (str): Type of optimal power flow ('dc', 'acrect', 'acjabr').
     connectivity (str): Connectivity for topology solutions ('off', 'on').
     solver (str): Solver to use ('gurobi', 'cplex', 'cbc').
-    mode (str): Strategy for relaxing binary variables:
+    sorted (str): Determines line order:
+        - "default": use range(ps.nlin)
+        - "ranking": use ranking_lines(ps)
+        - "random": use rand_line(ps) ps.nlin times (with replacement)
+    relax (str): Strategy for relaxing binary variables:
         - "all": Relax all binary variables except the current line.
-        - "closeX": Relax binary variables for lines not in close_lines at the specified level X (e.g., "close1").
-        - "sorted": Same as "all" but processes lines in the order given by ranking_lines.
+        - "close1": Relax binary variables for lines not in close_lines at level 1.
+        - "close2": Relax binary variables for lines not in close_lines at level 2.
     Returns:
     tuple: (total_time, avg_improvement)
     """
@@ -100,25 +106,28 @@ def update_bigm(ps, opf_type="dc", connectivity="off", solver="gurobi", mode="al
     improvements = []
     updated_bounds = []  # Store (line, type, f_bus, t_bus, old, new, improvement)
     # Determine line order
-    if mode == "sorted":
+    if sorted == "ranking":
         line_order = ranking_lines(ps)
-    else:
+    elif sorted == "random":
+        line_order = [rand_line(ps) for _ in range(ps.nlin)]
+    else:  # "default"
         line_order = range(ps.nlin)
     # First, update PFMAX and PFMIN with fix_status=1 for all lines
     for lin_index in line_order:
-        # Determine relaxed lines based on mode
-        if mode == "all" or mode == "sorted":
+        print(f"Processing line {lin_index} (sorted={sorted}, relax={relax})")
+        # Determine relaxed lines based on relax parameter
+        if relax == "all":
             relaxed_lines = [i for i in range(ps.nlin) if i != lin_index]
-        elif mode.startswith("close"):
+        elif relax.startswith("close"):
             try:
-                level = int(mode.replace("close", ""))
+                level = int(relax.replace("close", ""))
             except Exception:
-                print(f"Invalid mode: {mode}. Skipping line {lin_index}.")
+                print(f"Invalid relax: {relax}. Skipping line {lin_index}.")
                 continue
             close = set(close_lines(ps, lin_index, level=level))
             relaxed_lines = [i for i in range(ps.nlin) if i not in close]
         else:
-            print(f"Unknown mode: {mode}. Skipping line {lin_index}.")
+            print(f"Unknown relax: {relax}. Skipping line {lin_index}.")
             continue
 
         f_bus = ps.branches.loc[lin_index, "F_BUS"]
@@ -160,18 +169,19 @@ def update_bigm(ps, opf_type="dc", connectivity="off", solver="gurobi", mode="al
 
     # Then, update PFUPDC and PFLODC with fix_status=0 for all lines
     for lin_index in line_order:
-        if mode == "all" or mode == "sorted":
+        print(f"Processing line {lin_index} (sorted={sorted}, relax={relax})")
+        if relax == "all":
             relaxed_lines = [i for i in range(ps.nlin) if i != lin_index]
-        elif mode.startswith("close"):
+        elif relax.startswith("close"):
             try:
-                level = int(mode.replace("close", ""))
+                level = int(relax.replace("close", ""))
             except Exception:
-                print(f"Invalid mode: {mode}. Skipping line {lin_index}.")
+                print(f"Invalid relax: {relax}. Skipping line {lin_index}.")
                 continue
             close = set(close_lines(ps, lin_index, level=level))
             relaxed_lines = [i for i in range(ps.nlin) if i not in close]
         else:
-            print(f"Unknown mode: {mode}. Skipping line {lin_index}.")
+            print(f"Unknown relax: {relax}. Skipping line {lin_index}.")
             continue
 
         f_bus = ps.branches.loc[lin_index, "F_BUS"]
@@ -283,40 +293,134 @@ def ranking_lines(ps):
     return sorted_lines
 
 
-# Iterate over mode values
-results_df = pd.DataFrame(columns=["mode", "time_update_bigm", "improvement_bigm", "objective", "ots_time"])
-# for mode in ["all", "close1", "close2"]:
-for mode in ["all"]:
-    print(f"Running update_bigm with mode={mode}")
+def rand_line(ps):
+    """
+    Assigns each line a score equal to the sum of lines connected to its two buses,
+    and returns a random line index with probability proportional to its score.
 
-    # Create a new PowerSystem instance for each iteration
-    ps = PowerSystem("./src/amplpower/data/case118Blumsack.m")
+    Parameters:
+    ps (PowerSystem): An instance of the PowerSystem class.
+
+    Returns:
+    int: Index of the randomly selected line.
+    """
+    # Count number of lines connected to each bus
+    f_counts = ps.branches["F_BUS"].value_counts()
+    t_counts = ps.branches["T_BUS"].value_counts()
+    total_counts = f_counts.add(t_counts, fill_value=0)
+
+    # Compute points for each line
+    points = []
+    for _idx, branch in ps.branches.iterrows():
+        f_bus = branch["F_BUS"]
+        t_bus = branch["T_BUS"]
+        score = total_counts.get(f_bus, 0) + total_counts.get(t_bus, 0)
+        points.append(score)
+    points = np.array(points)
+
+    # Normalize to probabilities
+    prob = points / points.sum()
+    # Randomly select a line index
+    selected_idx = np.random.choice(ps.branches.index, p=prob)
+    return selected_idx
+
+
+def ots_heuristic(ps, opf_type="dc", connectivity="off", solver="gurobi"):
+    """
+    Runs a simple OTS heuristic: creates the model, sets the objective to minimize total generation cost,
+    solves the model, and returns the objective value.
+
+    Parameters:
+    ps (PowerSystem): Power system instance.
+    opf_type (str): OPF type.
+    connectivity (str): Connectivity option.
+    solver (str): Solver to use.
+
+    Returns:
+    float: Objective value (minimum cost) or None if not solved.
+    """
+    ps.create_model(opf_type, connectivity)
+    ps.ampl.eval("minimize cost: sum {g in G} (COST_2[g] * (BASEMVA*Pg[g])^2 + COST_1[g] * (BASEMVA*Pg[g]) + COST_0[g]);")
+    options = "outlev=1 threads=1 timelimit=10 mip:heurfrac=1"
+    ps.solve_model(solver, options)
+    solve_status = ps.ampl.solve_result
+    if solve_status == "solved":
+        obj_value = ps.ampl.get_objective("cost").value()
+    else:
+        obj_value = None
+    return obj_value
+
+
+def random_demand(ps, seed=None):
+    """
+    Modifies the 'PD' column of ps.buses by multiplying each value by a random number
+    drawn from a uniform distribution between 0.9 and 1.1.
+
+    Parameters:
+    ps (PowerSystem): Power system instance.
+    seed (int): Seed for the random number generator, for reproducibility.
+    """
+    if seed is not None:
+        np.random.seed(seed)
+    for b in ps.buses.index:
+        ps.buses.loc[b, "PD"] *= np.random.uniform(0.9, 1.1)
+
+
+def run_ots(m_file, demand_seed, sorted_val, relax_val):
+    """
+    Runs the OTS solving process with specified parameters.
+
+    Parameters:
+    m_file (str): Path to the .m file.
+    demand_seed (int): Seed for random demand.
+    sorted_val (str): Value for the 'sorted' parameter in update_bigm.
+    relax_val (str): Value for the 'relax' parameter in update_bigm.
+
+    Returns:
+    tuple: (time_update_bigm, improvement_bigm, ots_time, objective)
+    """
+    # Create a new PowerSystem instance
+    ps = PowerSystem(m_file)
+    random_demand(ps, seed=demand_seed)
     ps.set_switching("bigm")
-    ps.ubcost = 1560
+    ps.ubcost = ots_heuristic(ps, opf_type="dc", connectivity="off", solver="gurobi")
 
     # Update bounds and measure time
-    time_update_bigm, improvement_bigm = update_bigm(ps, mode=mode)
+    time_update_bigm, improvement_bigm = update_bigm(ps, sorted=sorted_val, relax=relax_val)
 
     # Solve OTS and compute results
-    ps.ubcost = 16000
-    results_ots = ps.solve_opf(opf_type="dc", switching="bigm", solver="gurobi", options="outlev=1 threads=1 timelimit=100")
+    results_ots = ps.solve_opf(opf_type="dc", switching="bigm", solver="gurobi", options="outlev=1 threads=1 timelimit=1000")
 
-    # Append results to the DataFrame
-    results_df = pd.concat(
-        [
-            results_df,
-            pd.DataFrame(
-                {
-                    "mode": [mode],
-                    "time_update_bigm": [time_update_bigm],
-                    "improvement_bigm": [improvement_bigm],
-                    "objective": [results_ots.obj],
-                    "ots_time": [results_ots.time],
-                }
-            ),
-        ],
-        ignore_index=True,
-    )
+    return time_update_bigm, improvement_bigm, results_ots.time, results_ots.obj
 
-# Display results on screen
-print(results_df)
+
+# Define cases
+cases = []
+for seed in range(100):
+    for sorted_val in ["default", "ranking"]:
+        for relax_val in ["all", "close1", "close2"]:
+            cases.append({"seed": seed, "sorted": sorted_val, "relax": relax_val})
+
+# Define SLURM index
+slurm_index = 0  # Example value, you can change this
+
+# Get the case corresponding to the SLURM index
+if 0 <= slurm_index < len(cases):
+    case = cases[slurm_index]
+    seed, sorted_val, relax_val = case["seed"], case["sorted"], case["relax"]
+    print(f"Running update_bigm with seed={seed}, sorted={sorted_val}, relax={relax_val}")
+
+    # Run OTS and store results
+    time_update_bigm, improvement_bigm, ots_time, objective = run_ots("./src/amplpower/data/case118Blumsack.m", seed, sorted_val, relax_val)
+
+    # Write results to CSV file
+    filename = f"{slurm_index}.csv"
+    filepath = Path(filename)
+    with filepath.open("w") as f:
+        f.write("seed,sorted,relax,time_update_bigm,improvement_bigm,ots_time,objective\n")
+        f.write(f"{seed},{sorted_val},{relax_val},{time_update_bigm},{improvement_bigm},{ots_time},{objective}\n")
+
+    print(f"Results written to {filename}")
+else:
+    print(f"SLURM index {slurm_index} is out of range (0-{len(cases) - 1}).")
+    sys.exit(1)
