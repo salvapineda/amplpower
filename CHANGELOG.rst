@@ -1,6 +1,11 @@
 Changelog
 =========
 
+0.0.29 (2025-06-02)
+-------------------
+
+* Bug with bound for power flows in OTS problem
+
 0.0.28 (2025-05-22)
 -------------------
 

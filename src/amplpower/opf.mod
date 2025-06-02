@@ -115,10 +115,10 @@ param VIMIN {N};
 ########## VARIABLES ##########
 var Pg {g in G} >= PMIN[g], <= PMAX[g]:= PG0[g];
 var Qg {g in G} >= QMIN[g], <= QMAX[g]:= QG0[g];
-var Pf {l in L} >= PFMIN[l], <= PFMAX[l] := PF0[l];
-var Pt {l in L} >= -PFMAX[l], <= -PFMIN[l] := PT0[l];
-var Qf {l in L} >= QFMIN[l], <= QFMAX[l] := QF0[l];
-var Qt {l in L} >= QFMIN[l], <= QFMAX[l] := QT0[l];
+var Pf {l in L} >= -Infinity := PF0[l];
+var Pt {l in L} >= -Infinity := PT0[l];
+var Qf {l in L} >= -Infinity := QF0[l];
+var Qt {l in L} >= -Infinity := QT0[l];
 var Vm {n in N} >= VMIN[n], <= VMAX[n] := VOL0[n];
 var Vr {n in N} >= VRMIN[n], <=VRMAX[n] := VOLR0[n];
 var Vi {n in N} >= VIMIN[n], <=VIMAX[n] := VOLI0[n];
