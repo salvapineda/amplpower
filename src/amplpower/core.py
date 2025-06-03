@@ -311,11 +311,20 @@ class PowerSystem:
 
     def set_switching(self, switching):
         """Set the switching status of the branches.
+
+        Explanations:
+        - 'off': All lines are connected (no switching, all BR_SWITCH=1).
+        - 'nl': Use binary variables for line connection with a non-linear formulation (BR_SWITCH=2).
+        - 'bigm': Use binary variables for line connection with a Big-M formulation (BR_SWITCH=3).
+        - 'df': Use the values already stored in BR_SWITCH (do not modify).
+        - numpy.ndarray: Directly set BR_SWITCH to the provided array.
+
         Switching statuses:
         0: The line is off.
         1: The line is on.
         2: The line is switchable and modeled with a non-linear approach.
         3: The line is switchable and modeled with a Big-M approach.
+
         Parameters:
         switching (str or np.ndarray): The switching strategy or array of statuses.
         """
@@ -327,6 +336,17 @@ class PowerSystem:
             self.branches["BR_SWITCH"] = 2
         elif switching == "bigm":
             self.branches["BR_SWITCH"] = 3
+        elif switching == "df":
+            # Do nothing, use existing BR_SWITCH values
+            pass
+        else:
+            raise ValueError(
+                f"Unknown switching value: {switching}. "
+                "Allowed values are 'off' (all lines connected), "
+                "'nl' (binary variables, non-linear formulation), "
+                "'bigm' (binary variables, Big-M formulation), "
+                "'df' (use existing BR_SWITCH), or a numpy array."
+            )
 
     def create_model(self, opf_type="dc", connectivity="off"):
         """Compute the feasible region for the power system.
