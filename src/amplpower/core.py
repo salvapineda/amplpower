@@ -544,6 +544,10 @@ class PowerSystem:
             results.bestbound = None
         results.time = self.ampl.get_value("_solve_time")
         results.solver_status = solver_status
+        # Provide solve_time, total_solve_time, solve_system_time only if solver is gurobi
+        if getattr(self, "ampl", None) and getattr(self.ampl, "solver", None) == "gurobi":
+            results.total_solve_time = self.ampl.get_value("_total_solve_time")
+            results.solve_system_time = self.ampl.get_value("_solve_system_time")
         results.max_viol = float(
             max(
                 np.max(np.abs(Pg_viol)),
