@@ -1,6 +1,11 @@
 Changelog
 =========
 
+0.0.31 (2025-06-03)
+-------------------
+
+* Remove minus infinity from variables in AMPL model
+
 0.0.30 (2025-06-03)
 -------------------
 
