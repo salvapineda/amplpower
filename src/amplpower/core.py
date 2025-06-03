@@ -250,11 +250,14 @@ class PowerSystem:
             amaxf, aminf = self.buses.loc[f_bus, "AMAX"], self.buses.loc[f_bus, "AMIN"]
             amaxt, amint = self.buses.loc[t_bus, "AMAX"], self.buses.loc[t_bus, "AMIN"]
             if br_x > 0:
-                self.branches.loc[lin_index, "PFUPDC"] = (1 / br_x) * (amaxf - amint)
-                self.branches.loc[lin_index, "PFLODC"] = (1 / br_x) * (aminf - amaxt)
+                pfupdc = (1 / br_x) * (amaxf - amint)
+                pflodc = (1 / br_x) * (aminf - amaxt)
             else:
-                self.branches.loc[lin_index, "PFUPDC"] = (1 / br_x) * (aminf - amaxt)
-                self.branches.loc[lin_index, "PFLODC"] = (1 / br_x) * (amaxf - amint)
+                pfupdc = (1 / br_x) * (aminf - amaxt)
+                pflodc = (1 / br_x) * (amaxf - amint)
+            # Apply ceil/floor with two decimals
+            self.branches.loc[lin_index, "PFUPDC"] = np.ceil(pfupdc * 100) / 100
+            self.branches.loc[lin_index, "PFLODC"] = np.floor(pflodc * 100) / 100
 
     def compute_bigm_ac(self):
         """Compute Big-M values for active and reactive power flows."""
@@ -272,39 +275,39 @@ class PowerSystem:
             pf_min, pf_max = find_min_max(
                 branch["GFF"], branch["GFT"], branch["BFT"], vminf, vmaxf, vmint, vmaxt, aminf - amaxt, amaxf - amint
             )
-            self.branches.loc[lin_index, "PFLOAC"] = pf_min
-            self.branches.loc[lin_index, "PFUPAC"] = pf_max
+            self.branches.loc[lin_index, "PFLOAC"] = np.floor(pf_min * 100) / 100
+            self.branches.loc[lin_index, "PFUPAC"] = np.ceil(pf_max * 100) / 100
 
             # Active power flow at "to" bus
             pt_min, pt_max = find_min_max(
                 branch["GTT"], branch["GTF"], branch["BTF"], vmint, vmaxt, vminf, vmaxf, amint - amaxf, amaxt - aminf
             )
-            self.branches.loc[lin_index, "PTLOAC"] = pt_min
-            self.branches.loc[lin_index, "PTUPAC"] = pt_max
+            self.branches.loc[lin_index, "PTLOAC"] = np.floor(pt_min * 100) / 100
+            self.branches.loc[lin_index, "PTUPAC"] = np.ceil(pt_max * 100) / 100
 
             # Reactive power flow at "from" bus
             qf_min, qf_max = find_min_max(
                 -branch["BFF"], -branch["BFT"], branch["GFT"], vminf, vmaxf, vmint, vmaxt, aminf - amaxt, amaxf - amint
             )
-            self.branches.loc[lin_index, "QFLOAC"] = qf_min
-            self.branches.loc[lin_index, "QFUPAC"] = qf_max
+            self.branches.loc[lin_index, "QFLOAC"] = np.floor(qf_min * 100) / 100
+            self.branches.loc[lin_index, "QFUPAC"] = np.ceil(qf_max * 100) / 100
 
             # Reactive power flow at "to" bus
             qt_min, qt_max = find_min_max(
                 -branch["BTT"], -branch["BTF"], branch["GTF"], vmint, vmaxt, vminf, vmaxf, amint - amaxf, amaxt - aminf
             )
-            self.branches.loc[lin_index, "QTLOAC"] = qt_min
-            self.branches.loc[lin_index, "QTUPAC"] = qt_max
+            self.branches.loc[lin_index, "QTLOAC"] = np.floor(qt_min * 100) / 100
+            self.branches.loc[lin_index, "QTUPAC"] = np.ceil(qt_max * 100) / 100
 
             # Cosine of angle difference
             cos_min, cos_max = find_min_max(0, 1, 0, vminf, vmaxf, vmint, vmaxt, aminf - amaxt, amaxf - amint)
-            self.branches.loc[lin_index, "COSFTMAX"] = cos_max
-            self.branches.loc[lin_index, "COSFTMIN"] = cos_min
+            self.branches.loc[lin_index, "COSFTMAX"] = np.ceil(cos_max * 100) / 100
+            self.branches.loc[lin_index, "COSFTMIN"] = np.floor(cos_min * 100) / 100
 
             # Sine of angle difference
             sin_min, sin_max = find_min_max(0, 0, 1, vminf, vmaxf, vmint, vmaxt, aminf - amaxt, amaxf - amint)
-            self.branches.loc[lin_index, "SINFTMAX"] = sin_max
-            self.branches.loc[lin_index, "SINFTMIN"] = sin_min
+            self.branches.loc[lin_index, "SINFTMAX"] = np.ceil(sin_max * 100) / 100
+            self.branches.loc[lin_index, "SINFTMIN"] = np.floor(sin_min * 100) / 100
 
     def set_switching(self, switching):
         """Set the switching status of the branches.

@@ -1,6 +1,11 @@
 Changelog
 =========
 
+0.0.30 (2025-06-03)
+-------------------
+
+* Floor and ceil function for initial BigM values in OTS
+
 0.0.29 (2025-06-02)
 -------------------
 
