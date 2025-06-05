@@ -1,7 +1,7 @@
 Changelog
 =========
 
-0.0.35 (2025-06-05)
+0.0.36 (2025-06-05)
 -------------------
 
 * Modify BigM default calculation for DC OTS

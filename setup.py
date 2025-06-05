@@ -13,7 +13,7 @@ def read(*names, **kwargs):
 
 setup(
     name="amplpower",
-    version="0.0.35",
+    version="0.0.36",
     license="MIT",
     description="AMPL package for power systems",
     long_description="{}\n{}".format(
