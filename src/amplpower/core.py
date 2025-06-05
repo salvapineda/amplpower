@@ -242,22 +242,14 @@ class PowerSystem:
     def compute_bigm_dc(self):
         """Compute Big-M values for DC power flow."""
         print("=======Computing Big-M values for DC power flow")
-        for lin_index in range(self.nlin):
-            branch = self.branches.iloc[lin_index]
-            br_x = branch["BR_X"]
-            f_bus = int(branch["F_BUS"])
-            t_bus = int(branch["T_BUS"])
-            amaxf, aminf = self.buses.loc[f_bus, "AMAX"], self.buses.loc[f_bus, "AMIN"]
-            amaxt, amint = self.buses.loc[t_bus, "AMAX"], self.buses.loc[t_bus, "AMIN"]
-            if br_x > 0:
-                pfupdc = (1 / br_x) * (amaxf - amint)
-                pflodc = (1 / br_x) * (aminf - amaxt)
-            else:
-                pfupdc = (1 / br_x) * (aminf - amaxt)
-                pflodc = (1 / br_x) * (amaxf - amint)
-            # Apply ceil/floor with two decimals
-            self.branches.loc[lin_index, "PFUPDC"] = np.ceil(pfupdc * 100) / 100
-            self.branches.loc[lin_index, "PFLODC"] = np.floor(pflodc * 100) / 100
+        weights = self.branches["PFMAX"] * self.branches["BR_X"]
+        bound_lp = weights.nlargest(self.nlin - 1).sum()
+
+        self.branches["PFUPDC"] = bound_lp / self.branches["BR_X"]
+        self.branches["PFLODC"] = -bound_lp / self.branches["BR_X"]
+
+        self.branches["PFUPDC"] = np.ceil(self.branches["PFUPDC"] * 100) / 100
+        self.branches["PFLODC"] = np.floor(self.branches["PFLODC"] * 100) / 100
 
     def compute_bigm_ac(self):
         """Compute Big-M values for active and reactive power flows."""
