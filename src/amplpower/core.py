@@ -38,6 +38,7 @@ class PowerSystem:
         self.compute_bigm_dc()
         self.compute_bigm_ac()
         self.compute_ptdf()
+        self.compute_lodf()
 
     def load_data(self):
         """Load MATPOWER case data into DataFrames and convert to per unit."""
@@ -308,9 +309,9 @@ class PowerSystem:
         The slack bus is the one with TYPE == 3 in self.buses dataframe.
         """
         # Find slack bus index
-        slack_buses = self.buses.index[self.buses["TYPE"] == 3].tolist()
+        slack_buses = self.buses.index[self.buses["BUS_TYPE"] == 3].tolist()
         if not slack_buses:
-            raise ValueError("No slack bus (TYPE==3) found in buses dataframe.")
+            raise ValueError("No slack bus (BUS_TYPE==3) found in buses dataframe.")
         slack = slack_buses[0]
 
         # Build Bbus and Bf matrices
@@ -349,6 +350,33 @@ class PowerSystem:
                     idx = keep.index(i)
                     PTDF[k, i] = Bf[k, keep][idx] - Bf[k, keep] @ Bbus_red_inv[:, idx]
         self.ptdf = PTDF
+
+    def compute_lodf(self):
+        """
+        Compute the LODF (Line Outage Distribution Factor) matrix and store it in self.lodf.
+        Requires self.ptdf to be already computed.
+        """
+        if not hasattr(self, "ptdf"):
+            raise AttributeError("PTDF matrix not found. Please run compute_ptdf() first.")
+
+        nlin = self.nlin
+        ptdf = self.ptdf
+        lodf = np.zeros((nlin, nlin))
+
+        for k in range(nlin):
+            for m in range(nlin):  # renamed from 'l' to 'm' to avoid ambiguous variable name
+                if k == m:
+                    lodf[k, m] = -1.0
+                else:
+                    # denom = 1.0 - ptdf[m, self.branches.loc[k, "F_BUS"]] + ptdf[m, self.branches.loc[k, "T_BUS"]]
+                    # For DC, LODF[k, m] = PTDF[k, m] / (1 - PTDF[m, m])
+                    # But here, PTDF[k, m] is the effect of injection at bus m on line k
+                    # Standard formula: LODF[k, m] = PTDF[k, m] / (1 - PTDF[m, m])
+                    # But we use the effect of outage of line m on line k
+                    # For MATPOWER convention:
+                    lodf[k, m] = ptdf[k, self.branches.loc[m, "F_BUS"]] - ptdf[k, self.branches.loc[m, "T_BUS"]]
+                    lodf[k, m] /= 1.0 - (ptdf[m, self.branches.loc[m, "F_BUS"]] - ptdf[m, self.branches.loc[m, "T_BUS"]])
+        self.lodf = lodf
 
     def set_switching(self, switching):
         """Set the switching status of the branches.
