@@ -306,77 +306,48 @@ class PowerSystem:
     def compute_ptdf(self):
         """
         Compute the PTDF (Power Transfer Distribution Factor) matrix and store it in self.ptdf.
-        The slack bus is the one with TYPE == 3 in self.buses dataframe.
+        The slack bus is the one with BUS_TYPE == 3 in self.buses dataframe.
         """
-        # Find slack bus index
-        slack_buses = self.buses.index[self.buses["BUS_TYPE"] == 3].tolist()
-        if not slack_buses:
-            raise ValueError("No slack bus (BUS_TYPE==3) found in buses dataframe.")
-        slack = slack_buses[0]
-
-        # Build Bbus and Bf matrices
-        nbus = self.nbus
         nlin = self.nlin
-        # Susceptance for each branch
-        b = 1 / self.branches["BR_X"].values
-        # Connection matrices
-        Cf = self.cf
-        Ct = self.ct
-        # Bf: branch-to-bus incidence times susceptance
-        Bf = (Cf - Ct) * b[:, np.newaxis]
-        # Bbus: bus susceptance matrix
-        Bbus = np.zeros((nbus, nbus))
-        for k in range(nlin):
-            f = int(self.branches.loc[k, "F_BUS"])
-            t = int(self.branches.loc[k, "T_BUS"])
-            Bbus[f, f] += b[k]
-            Bbus[t, t] += b[k]
-            Bbus[f, t] -= b[k]
-            Bbus[t, f] -= b[k]
-        # Remove slack bus row and column
-        keep = [i for i in range(nbus) if i != slack]
-        Bbus_red = Bbus[np.ix_(keep, keep)]
-        # Invert reduced Bbus
-        Bbus_red_inv = np.linalg.inv(Bbus_red)
-        # Build PTDF
+        nbus = self.nbus
+        # Find reference bus (BUS_TYPE == 3)
+        ref_bus_idx = self.buses.index[self.buses["BUS_TYPE"] == 3][0]
+        ref_bus_pos = list(self.buses.index).index(ref_bus_idx)
+        # Build branch-to-node incidence matrix A (nlin x nbus)
+        A = self.cf - self.ct  # shape (nlin, nbus)
+        # Remove slack bus column
+        keep = [i for i in range(nbus) if i != ref_bus_pos]
+        A_red = A[:, keep]  # shape (nlin, nbus-1)
+        # Diagonal matrix of line reactances
+        X = np.diag(self.branches["BR_X"].values)  # shape (nlin, nlin)
+        Xinv = np.linalg.inv(X)
+        # Compute B = A_red.T @ Xinv @ A_red
+        B = A_red.T @ Xinv @ A_red  # shape (nbus-1, nbus-1)
+        B_inv = np.linalg.inv(B)
+        # Compute PTDF: Xinv @ A_red @ B_inv
+        PTDF_red = Xinv @ A_red @ B_inv  # shape (nlin, nbus-1)
+        # Insert zeros for slack bus column
         PTDF = np.zeros((nlin, nbus))
-        for k in range(nlin):
-            f = int(self.branches.loc[k, "F_BUS"])
-            t = int(self.branches.loc[k, "T_BUS"])
-            for i in range(nbus):
-                if i == slack:
-                    PTDF[k, i] = 0
-                else:
-                    idx = keep.index(i)
-                    PTDF[k, i] = Bf[k, keep][idx] - Bf[k, keep] @ Bbus_red_inv[:, idx]
+        PTDF[:, keep] = PTDF_red
         self.ptdf = PTDF
 
     def compute_lodf(self):
         """
         Compute the LODF (Line Outage Distribution Factor) matrix and store it in self.lodf.
-        Requires self.ptdf to be already computed.
+        Uses the PTDF matrix already stored in self.ptdf.
         """
-        if not hasattr(self, "ptdf"):
-            raise AttributeError("PTDF matrix not found. Please run compute_ptdf() first.")
-
         nlin = self.nlin
-        ptdf = self.ptdf
-        lodf = np.zeros((nlin, nlin))
-
-        for k in range(nlin):
-            for m in range(nlin):  # renamed from 'l' to 'm' to avoid ambiguous variable name
-                if k == m:
-                    lodf[k, m] = -1.0
-                else:
-                    # denom = 1.0 - ptdf[m, self.branches.loc[k, "F_BUS"]] + ptdf[m, self.branches.loc[k, "T_BUS"]]
-                    # For DC, LODF[k, m] = PTDF[k, m] / (1 - PTDF[m, m])
-                    # But here, PTDF[k, m] is the effect of injection at bus m on line k
-                    # Standard formula: LODF[k, m] = PTDF[k, m] / (1 - PTDF[m, m])
-                    # But we use the effect of outage of line m on line k
-                    # For MATPOWER convention:
-                    lodf[k, m] = ptdf[k, self.branches.loc[m, "F_BUS"]] - ptdf[k, self.branches.loc[m, "T_BUS"]]
-                    lodf[k, m] /= 1.0 - (ptdf[m, self.branches.loc[m, "F_BUS"]] - ptdf[m, self.branches.loc[m, "T_BUS"]])
-        self.lodf = lodf
+        PTDF = self.ptdf  # shape (nlin, nbus)
+        # Build branch-to-node incidence matrix A (nlin x nbus)
+        A = self.cf - self.ct  # shape (nlin, nbus)
+        # H = PTDF @ A.T (A.T is nbus x nlin)
+        H = PTDF @ A.T  # shape (nlin, nlin)
+        h = np.diag(H)
+        denom_mat = np.ones((nlin, nlin)) - np.outer(np.ones(nlin), h)
+        LODF = H / denom_mat
+        np.fill_diagonal(LODF, 0)
+        LODF = LODF - np.eye(nlin)
+        self.lodf = LODF
 
     def set_switching(self, switching):
         """Set the switching status of the branches.
