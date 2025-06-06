@@ -37,6 +37,7 @@ class PowerSystem:
         self.compute_voltage_bounds()
         self.compute_bigm_dc()
         self.compute_bigm_ac()
+        self.compute_ptdf()
 
     def load_data(self):
         """Load MATPOWER case data into DataFrames and convert to per unit."""
@@ -300,6 +301,54 @@ class PowerSystem:
             sin_min, sin_max = find_min_max(0, 0, 1, vminf, vmaxf, vmint, vmaxt, aminf - amaxt, amaxf - amint)
             self.branches.loc[lin_index, "SINFTMAX"] = np.ceil(sin_max * 100) / 100
             self.branches.loc[lin_index, "SINFTMIN"] = np.floor(sin_min * 100) / 100
+
+    def compute_ptdf(self):
+        """
+        Compute the PTDF (Power Transfer Distribution Factor) matrix and store it in self.ptdf.
+        The slack bus is the one with TYPE == 3 in self.buses dataframe.
+        """
+        # Find slack bus index
+        slack_buses = self.buses.index[self.buses["TYPE"] == 3].tolist()
+        if not slack_buses:
+            raise ValueError("No slack bus (TYPE==3) found in buses dataframe.")
+        slack = slack_buses[0]
+
+        # Build Bbus and Bf matrices
+        nbus = self.nbus
+        nlin = self.nlin
+        # Susceptance for each branch
+        b = 1 / self.branches["BR_X"].values
+        # Connection matrices
+        Cf = self.cf
+        Ct = self.ct
+        # Bf: branch-to-bus incidence times susceptance
+        Bf = (Cf - Ct) * b[:, np.newaxis]
+        # Bbus: bus susceptance matrix
+        Bbus = np.zeros((nbus, nbus))
+        for k in range(nlin):
+            f = int(self.branches.loc[k, "F_BUS"])
+            t = int(self.branches.loc[k, "T_BUS"])
+            Bbus[f, f] += b[k]
+            Bbus[t, t] += b[k]
+            Bbus[f, t] -= b[k]
+            Bbus[t, f] -= b[k]
+        # Remove slack bus row and column
+        keep = [i for i in range(nbus) if i != slack]
+        Bbus_red = Bbus[np.ix_(keep, keep)]
+        # Invert reduced Bbus
+        Bbus_red_inv = np.linalg.inv(Bbus_red)
+        # Build PTDF
+        PTDF = np.zeros((nlin, nbus))
+        for k in range(nlin):
+            f = int(self.branches.loc[k, "F_BUS"])
+            t = int(self.branches.loc[k, "T_BUS"])
+            for i in range(nbus):
+                if i == slack:
+                    PTDF[k, i] = 0
+                else:
+                    idx = keep.index(i)
+                    PTDF[k, i] = Bf[k, keep][idx] - Bf[k, keep] @ Bbus_red_inv[:, idx]
+        self.ptdf = PTDF
 
     def set_switching(self, switching):
         """Set the switching status of the branches.
