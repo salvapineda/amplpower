@@ -600,3 +600,67 @@ class PowerSystem:
         )
 
         return results
+
+    def is_feasible(self, voltages, angles):
+        """
+        Check feasibility of a given voltage and angle vector.
+        Returns a dictionary with slacks for each constraint.
+        If a variable is feasible, slack is 0. Otherwise, it is the absolute value needed to make it feasible.
+        """
+        slacks = {}
+
+        # 1. Voltage magnitude and angle bounds
+        vmin = self.buses["VMIN"].values
+        vmax = self.buses["VMAX"].values
+        amin = self.buses["AMIN"].values
+        amax = self.buses["AMAX"].values
+
+        Vm_slack = np.maximum(0, vmin - voltages) + np.maximum(0, voltages - vmax)
+        Va_slack = np.maximum(0, amin - angles) + np.maximum(0, angles - amax)
+        slacks["Vm_slack"] = Vm_slack
+        slacks["Va_slack"] = Va_slack
+
+        # 2. Compute bus voltages
+        v = voltages * np.exp(1j * angles)
+
+        # 3. Compute branch flows
+        sf = (self.cf @ v) * np.conj(self.yf @ v)
+        st = (self.ct @ v) * np.conj(self.yt @ v)
+
+        # 4. Branch flow bounds (use RATE_A)
+        rate_a = self.branches["RATE_A"].values
+        abs_sf = np.abs(sf)
+        abs_st = np.abs(st)
+        Pf_slack = np.maximum(0, abs_sf - rate_a)
+        Pt_slack = np.maximum(0, abs_st - rate_a)
+        slacks["Sf_slack"] = Pf_slack
+        slacks["St_slack"] = Pt_slack
+
+        # 5. Power balance at buses: Pg + jQg = Sbus = v * conj(yb @ v) + Sload
+        sd = self.buses["PD"].values + 1j * self.buses["QD"].values
+        sb = v * np.conj(self.yb @ v)
+        sg = sb + sd  # total generation at each bus
+
+        # 6. Split generator injections among generators at each bus
+        pg = np.zeros(self.ngen)
+        qg = np.zeros(self.ngen)
+        for bus in range(self.nbus):
+            gen_indices = self.generators[self.generators["GEN_BUS"] == bus].index
+            if len(gen_indices) > 0:
+                pmax_total = self.generators.loc[gen_indices, "PMAX"].sum()
+                if pmax_total > 0:
+                    pg[gen_indices] = np.real(sg[bus]) * self.generators.loc[gen_indices, "PMAX"] / pmax_total
+                    qg[gen_indices] = np.imag(sg[bus]) * self.generators.loc[gen_indices, "PMAX"] / pmax_total
+
+        # 7. Generator bounds
+        pmin = self.generators["PMIN"].values
+        pmax = self.generators["PMAX"].values
+        qmin = self.generators["QMIN"].values
+        qmax = self.generators["QMAX"].values
+
+        Pg_slack = np.maximum(0, pmin - pg) + np.maximum(0, pg - pmax)
+        Qg_slack = np.maximum(0, qmin - qg) + np.maximum(0, qg - qmax)
+        slacks["Pg_slack"] = Pg_slack
+        slacks["Qg_slack"] = Qg_slack
+
+        return slacks

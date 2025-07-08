@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.0.39 (2025-07-08)
+-------------------
+* Add is_feasible method to check feasibility of a given solution
+
 0.0.38 (2025-06-06)
 -------------------
 
