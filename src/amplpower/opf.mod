@@ -338,11 +338,11 @@ subject to jabr_relaxation_ft {l in L:OPF_TYPE = 'acrect' or OPF_TYPE = 'acjabr'
 
 ########## SLACK BUS ##########
 
-subject to eq_slack:
-    Va[0] == 0;
+subject to eq_slack {n in N: BUS_TYPE[n] == 3}:
+    Va[n] == 0;
 
-subject to eq_slack_imag:
-    Vi[0] == 0;
+subject to eq_slack_imag {n in N: BUS_TYPE[n] == 3}:
+    Vi[n] == 0;
 
 ########## CONNECTIVITY CONSTRAINTS ##########
 

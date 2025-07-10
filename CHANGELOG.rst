@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.0.41 (2025-07-10)
+-------------------
+* Slack bus in bustype 3
+
 0.0.40 (2025-07-10)
 -------------------
 * Fix bug in initialization and is_feasible with shunt elements
