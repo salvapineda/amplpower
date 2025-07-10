@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.0.40 (2025-07-10)
+-------------------
+* Fix bug in initialization and is_feasible with shunt elements
+
 0.0.39 (2025-07-08)
 -------------------
 * Add is_feasible method to check feasibility of a given solution

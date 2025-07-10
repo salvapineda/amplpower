@@ -185,7 +185,8 @@ class PowerSystem:
         # Compute generator outputs
         sd = self.buses["PD"].values + 1j * self.buses["QD"].values
         sb = v * np.conj(self.yb @ v)
-        sg = sb + sd
+        ss = self.buses["GS"].values * voltages**2 - 1j * self.buses["BS"].values * voltages**2
+        sg = sb + sd + ss
         pg_split = np.zeros(self.ngen)
         qg_split = np.zeros(self.ngen)
         for bus in range(self.nbus):
@@ -639,7 +640,8 @@ class PowerSystem:
         # 5. Power balance at buses: Pg + jQg = Sbus = v * conj(yb @ v) + Sload
         sd = self.buses["PD"].values + 1j * self.buses["QD"].values
         sb = v * np.conj(self.yb @ v)
-        sg = sb + sd  # total generation at each bus
+        ss = self.buses["GS"].values * voltages**2 - 1j * self.buses["BS"].values * voltages**2
+        sg = sb + sd + ss  # total generation at each bus
 
         # 6. Split generator injections among generators at each bus
         pg = np.zeros(self.ngen)
