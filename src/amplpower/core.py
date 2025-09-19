@@ -568,6 +568,8 @@ class PowerSystem:
             {
                 "Vm": Vm,
                 "Va": Va,
+                "Vr": volr if opf_type == "acrect" or opf_type == "acjabr" else None,
+                "Vi": voli if opf_type == "acrect" or opf_type == "acjabr" else None,
                 "Vm_viol": Vm_viol,
                 "Va_viol": Va_viol,
                 "P_viol": P_viol,
