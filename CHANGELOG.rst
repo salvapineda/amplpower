@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.0.42 (2025-09-19)
+-------------------
+* Get Vr and Vi in buses results
+
 0.0.41 (2025-07-10)
 -------------------
 * Slack bus in bustype 3
