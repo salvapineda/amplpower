@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.0.43 (2026-01-29)
+-------------------
+* Incorporate cartesian variables to Jabr mode
+
 0.0.42 (2025-09-19)
 -------------------
 * Get Vr and Vi in buses results
