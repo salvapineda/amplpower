@@ -542,6 +542,9 @@ class PowerSystem:
                     elif t_bus in visited and np.isnan(Va[f_bus]):
                         Va[f_bus] = Va[t_bus] - np.arccos(cosft[line_index])
                         visited.add(f_bus)
+            # Rectangular voltage components
+            volr = Vm * np.cos(Va)
+            voli = Vm * np.sin(Va)
         else:
             Vm = self.ampl.get_variable("Vm").get_values().to_pandas().values.flatten()
             Va = self.ampl.get_variable("Va").get_values().to_pandas().values.flatten()
