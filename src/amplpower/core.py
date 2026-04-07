@@ -525,8 +525,10 @@ class PowerSystem:
             vol2 = self.ampl.get_variable("V2").get_values().to_pandas().values.flatten()
             Vm = np.sqrt(vol2)
             vfvtcosft = self.ampl.get_variable("cosft").get_values().to_pandas().values.flatten()
+            vfvtsinft = self.ampl.get_variable("sinft").get_values().to_pandas().values.flatten()
             vfvt = np.array([Vm[int(self.branches.loc[i, "F_BUS"])] * Vm[int(self.branches.loc[i, "T_BUS"])] for i in range(self.nlin)])
             cosft = np.maximum(-1, np.minimum(1, vfvtcosft / vfvt))
+            sinft = np.maximum(-1, np.minimum(1, vfvtsinft / vfvt))
             # Compute angles for all buses
             Va = np.full(self.nbus, np.nan)  # Initialize angles with NaN
             Va[0] = 0  # Reference bus angle is 0
@@ -536,11 +538,12 @@ class PowerSystem:
                 for line_index in range(self.nlin):
                     f_bus = int(self.branches.loc[line_index, "F_BUS"])
                     t_bus = int(self.branches.loc[line_index, "T_BUS"])
+                    angle_diff = np.arctan2(sinft[line_index], cosft[line_index])
                     if f_bus in visited and np.isnan(Va[t_bus]):
-                        Va[t_bus] = Va[f_bus] + np.arccos(cosft[line_index])
+                        Va[t_bus] = Va[f_bus] + angle_diff
                         visited.add(t_bus)
                     elif t_bus in visited and np.isnan(Va[f_bus]):
-                        Va[f_bus] = Va[t_bus] - np.arccos(cosft[line_index])
+                        Va[f_bus] = Va[t_bus] - angle_diff
                         visited.add(f_bus)
             # Rectangular voltage components
             volr = Vm * np.cos(Va)
