@@ -1,6 +1,14 @@
 Changelog
 =========
 
+0.0.44 (2026-04-21)
+-------------------
+* Improved voltage angle reconstruction in AC OPF (acjabr):
+	- Switched from using only np.arccos(cosft) to np.arctan2(sinft, cosft) for voltage angle calculation.
+	- Now handles all angle quadrants and preserves correct sign and range.
+	- More accurate voltage angle assignment in OPF results.
+
+
 0.0.43 (2026-01-29)
 -------------------
 * Incorporate cartesian variables to Jabr mode
