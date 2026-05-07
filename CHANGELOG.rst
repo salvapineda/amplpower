@@ -1,6 +1,10 @@
 Changelog
 =========
 
+0.0.45 (2026-05-07)
+-------------------
+* Allow for any slack bus and fix bug with signs
+
 0.0.44 (2026-04-21)
 -------------------
 * Improved voltage angle reconstruction in AC OPF (acjabr):

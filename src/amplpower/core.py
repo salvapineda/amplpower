@@ -531,19 +531,20 @@ class PowerSystem:
             sinft = np.maximum(-1, np.minimum(1, vfvtsinft / vfvt))
             # Compute angles for all buses
             Va = np.full(self.nbus, np.nan)  # Initialize angles with NaN
-            Va[0] = 0  # Reference bus angle is 0
+            slack = int(self.buses.index[self.buses["BUS_TYPE"] == 3][0])
+            Va[slack] = 0
+            visited = {slack}
             # Iteratively compute angles
-            visited = {0}  # Start with the reference bus
             while len(visited) < self.nbus:
                 for line_index in range(self.nlin):
                     f_bus = int(self.branches.loc[line_index, "F_BUS"])
                     t_bus = int(self.branches.loc[line_index, "T_BUS"])
                     angle_diff = np.arctan2(sinft[line_index], cosft[line_index])
                     if f_bus in visited and np.isnan(Va[t_bus]):
-                        Va[t_bus] = Va[f_bus] + angle_diff
+                        Va[t_bus] = Va[f_bus] - angle_diff
                         visited.add(t_bus)
                     elif t_bus in visited and np.isnan(Va[f_bus]):
-                        Va[f_bus] = Va[t_bus] - angle_diff
+                        Va[f_bus] = Va[t_bus] + angle_diff
                         visited.add(f_bus)
             # Rectangular voltage components
             volr = Vm * np.cos(Va)
